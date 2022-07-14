@@ -114,12 +114,14 @@ Future<void> atTalk(List<String> args) async {
 
   // Wait for initial sync to complete
   _logger.info("Waiting for initial sync");
+  stdout.write("Synching your data.");
   syncComplete = false;
   atClientManager.syncService.sync(onDone: onSyncDone);
   while (!syncComplete) {
-    await Future.delayed(Duration(milliseconds: 100));
+    await Future.delayed(Duration(milliseconds: 500));
+    stdout.write(".");
   }
-
+  print('');
 // Keep an eye on connectivity and report failures if we see them
   ConnectivityListener().subscribe().listen((isConnected) {
     if (isConnected) {
@@ -169,7 +171,7 @@ Future<void> atTalk(List<String> args) async {
       ..sharedWith = toAtsign
       ..namespace = atClient?.getPreferences()?.namespace
       ..metadata = metaData;
-    if (! (input == "")) {
+    if (!(input == "")) {
       try {
         await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
           _logger.info('SUCCESS:' + notification.toString());
