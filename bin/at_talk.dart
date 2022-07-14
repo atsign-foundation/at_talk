@@ -169,15 +169,16 @@ Future<void> atTalk(List<String> args) async {
       ..sharedWith = toAtsign
       ..namespace = atClient?.getPreferences()?.namespace
       ..metadata = metaData;
-
-    try {
-      await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
-        _logger.info('SUCCESS:' + notification.toString());
-      }, onError: (notification) {
-        _logger.info('ERROR:' + notification.toString());
-      });
-    } catch (e) {
-      _logger.severe(e.toString());
+    if (! (input == "")) {
+      try {
+        await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
+          _logger.info('SUCCESS:' + notification.toString());
+        }, onError: (notification) {
+          _logger.info('ERROR:' + notification.toString());
+        });
+      } catch (e) {
+        _logger.severe(e.toString());
+      }
     }
   }
 }
