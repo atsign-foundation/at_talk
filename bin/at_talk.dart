@@ -4,6 +4,7 @@ import 'dart:async';
 
 // external packages
 import 'package:args/args.dart';
+import 'package:at_talk/pipe_print.dart';
 import 'package:logging/src/level.dart';
 import 'package:chalkdart/chalk.dart';
 import 'package:chalkdart/chalk_x11.dart';
@@ -19,8 +20,12 @@ import 'package:at_talk/home_directory.dart';
 import 'package:at_talk/check_file_exists.dart';
 
 void main(List<String> args) async {
+     ProcessSignal.sigpipe.watch().listen((signal) async {
+        exit(0);
+  });
+  
   //starting secondary in a zone
-  var logger = AtSignLogger('atNautel sender ');
+  var logger = AtSignLogger('atTalk sender ');
   runZonedGuarded(() async {
     await atTalk(args);
   }, (error, stackTrace) {
@@ -37,7 +42,7 @@ Future<void> atTalk(List<String> args) async {
   var parser = ArgParser();
 // Args
   parser.addOption('key-file',
-      abbr: 'k', mandatory: false, help: 'transmitters @sign\'s atKeys file if not in ~/.atsign/keys/');
+      abbr: 'k', mandatory: false, help: 'Your @sign\'s atKeys file if not in ~/.atsign/keys/');
   parser.addOption('atsign', abbr: 'a', mandatory: true, help: 'Your atSign');
   parser.addOption('toatsign', abbr: 't', mandatory: true, help: 'Talk to this @sign');
   parser.addFlag('verbose', abbr: 'v', help: 'More logging');
@@ -140,13 +145,16 @@ Future<void> atTalk(List<String> args) async {
       _logger.info('atTalk update recieved from ' + notification.from + ' notification id : ' + notification.id);
       var talk = notification.value!;
       print(chalk.brightGreen.dim('\r$toAtsign: ') + chalk.brightGreen(talk));
-      stdout.write(chalk.brightWhite.dim('$fromAtsign: '));
+      
+      pipePrint('$fromAtsign: ');
     }
   }),
       onError: (e) => _logger.severe('Notification Failed:' + e.toString()),
       onDone: () => _logger.info('Notification listener stopped'));
   String input = "";
-  stdout.write(chalk.brightWhite.dim('$fromAtsign: '));
+  pipePrint('$fromAtsign: ');
+
+
 
   var lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
 
@@ -156,7 +164,7 @@ Future<void> atTalk(List<String> args) async {
       exit(0);
     }
 
-    stdout.write(chalk.brightWhite.dim('$fromAtsign: '));
+    pipePrint('$fromAtsign: ');
 
     var metaData = Metadata()
       ..isPublic = false
@@ -173,7 +181,7 @@ Future<void> atTalk(List<String> args) async {
       ..metadata = metaData;
     if (!(input == "")) {
       try {
-        await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
+        notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
           _logger.info('SUCCESS:' + notification.toString());
         }, onError: (notification) {
           _logger.info('ERROR:' + notification.toString());
