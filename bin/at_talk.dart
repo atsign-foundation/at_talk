@@ -20,10 +20,8 @@ import 'package:at_talk/home_directory.dart';
 import 'package:at_talk/check_file_exists.dart';
 
 void main(List<String> args) async {
-     ProcessSignal.sigpipe.watch().listen((signal) async {
-        exit(0);
-  });
-  
+
+
   //starting secondary in a zone
   var logger = AtSignLogger('atTalk sender ');
   runZonedGuarded(() async {
