@@ -7,8 +7,6 @@ import 'package:args/args.dart';
 import 'package:at_talk/pipe_print.dart';
 import 'package:logging/src/level.dart';
 import 'package:chalkdart/chalk.dart';
-import 'package:chalkdart/chalk_x11.dart';
-import 'package:chalkdart/colorutils.dart';
 
 // @platform packages
 import 'package:at_client/at_client.dart';
@@ -43,6 +41,7 @@ Future<void> atTalk(List<String> args) async {
       abbr: 'k', mandatory: false, help: 'Your @sign\'s atKeys file if not in ~/.atsign/keys/');
   parser.addOption('atsign', abbr: 'a', mandatory: true, help: 'Your atSign');
   parser.addOption('toatsign', abbr: 't', mandatory: true, help: 'Talk to this @sign');
+  parser.addOption('root-domain', abbr: 'd', mandatory: false, help: 'Root Domain (defaults to root.atsign.org)');
   parser.addFlag('verbose', abbr: 'v', help: 'More logging');
 
   // Check the arguments
@@ -53,6 +52,7 @@ Future<void> atTalk(List<String> args) async {
   String toAtsign = 'unknown';
   String? homeDirectory = getHomeDirectory();
   String nameSpace = 'ai6bh';
+  String rootDomain = 'root.atsign.org';
 
   try {
     // Arg check
@@ -60,6 +60,10 @@ Future<void> atTalk(List<String> args) async {
     // Find @sign key file
     fromAtsign = results['atsign'];
     toAtsign = results['toatsign'];
+
+    if (results['root-domain'] != null) {
+      rootDomain = results['root-domain'];
+    }
 
     if (results['key-file'] != null) {
       atsignFile = results['key-file'];
@@ -94,6 +98,7 @@ Future<void> atTalk(List<String> args) async {
     ..isLocalStoreRequired = true
     ..commitLogPath = '$homeDirectory/.$nameSpace/$fromAtsign/storage/commitLog'
     //..cramSecret = '<your cram secret>';
+    ..rootDomain = rootDomain
     ..atKeysFilePath = atsignFile;
 
   AtOnboardingService onboardingService = AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig);
@@ -117,7 +122,7 @@ Future<void> atTalk(List<String> args) async {
 
   // Wait for initial sync to complete
   _logger.info("Waiting for initial sync");
-  stdout.write("Synching your data.");
+  stdout.write("Syncing your data.");
   syncComplete = false;
   atClientManager.syncService.sync(onDone: onSyncDone);
   while (!syncComplete) {
@@ -140,9 +145,9 @@ Future<void> atTalk(List<String> args) async {
     keyAtsign = keyAtsign.replaceAll(notification.to + ':', '');
     keyAtsign = keyAtsign.replaceAll('.' + nameSpace + notification.from, '');
     if (keyAtsign == 'attalk') {
-      _logger.info('atTalk update recieved from ' + notification.from + ' notification id : ' + notification.id);
+      _logger.info('atTalk update received from ' + notification.from + ' notification id : ' + notification.id);
       var talk = notification.value!;
-      print(chalk.brightGreen.dim('\r$toAtsign: ') + chalk.brightGreen(talk));
+      print(chalk.brightGreen.dim.onBlack('\r$toAtsign: ') + chalk.brightGreen(talk));
       
       pipePrint('$fromAtsign: ');
     }
@@ -156,6 +161,7 @@ Future<void> atTalk(List<String> args) async {
 
   var lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
 
+  bool firstSend = true;
   await for (final l in lines) {
     input = l;
     if (input == '/exit') {
@@ -179,14 +185,26 @@ Future<void> atTalk(List<String> args) async {
       ..metadata = metaData;
     if (!(input == "")) {
       try {
-        notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
-          _logger.info('SUCCESS:' + notification.toString());
-        }, onError: (notification) {
-          _logger.info('ERROR:' + notification.toString());
-        });
+        if (firstSend) {
+          await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
+            _logger.warning('SUCCESS:' + notification.toString());
+          }, onError: (notification) {
+            _logger.severe('ERROR:' + notification.toString());
+          });
+
+          firstSend = false;
+        } else {
+          notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
+            _logger.warning('SUCCESS:' + notification.toString());
+          }, onError: (notification) {
+            _logger.severe('ERROR:' + notification.toString());
+          });
+        }
       } catch (e) {
         _logger.severe(e.toString());
       }
     }
   }
+
 }
+
