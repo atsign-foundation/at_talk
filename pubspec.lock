@@ -53,10 +53,12 @@ packages:
   at_client:
     dependency: "direct main"
     description:
-      name: at_client
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "3.0.29"
+      path: at_client
+      ref: RemoveNetworkCheckFrom_AtClientImpl_notify
+      resolved-ref: b62268520ffe4574443389e0f0ae039c07a1b5b5
+      url: "https://github.com/atsign-foundation/at_client_sdk.git"
+    source: git
+    version: "3.0.30"
   at_commons:
     dependency: transitive
     description:
@@ -70,7 +72,7 @@ packages:
       name: at_lookup
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "3.0.26"
+    version: "3.0.27"
   at_onboarding_cli:
     dependency: "direct main"
     description:
@@ -357,7 +359,7 @@ packages:
       name: pointycastle
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "3.6.0"
+    version: "3.6.1"
   pool:
     dependency: transitive
     description:
