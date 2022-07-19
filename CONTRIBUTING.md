@@ -33,8 +33,8 @@ if you don't already have Dart (or Flutter) installed.
 
 To prepare your dedicated GitHub repository:
 
-1. Fork in GitHub https://github.com/atsign-foundation/sshnoports
-2. Clone *your forked repository* (e.g., `git clone git@github.com:yourname/sshnoports`)
+1. Fork in GitHub https://github.com/atsign-foundation/at_talk
+2. Clone *your forked repository* (e.g., `git clone git@github.com:yourname/at_talk`)
 3. Set your remotes as follows:
 
    ```sh
