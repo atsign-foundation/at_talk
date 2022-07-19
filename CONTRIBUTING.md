@@ -38,17 +38,17 @@ To prepare your dedicated GitHub repository:
 3. Set your remotes as follows:
 
    ```sh
-   cd sshnoports
-   git remote add upstream git@github.com:atsign-foundation/sshnoports.git
+   cd at_talk
+   git remote add upstream git@github.com:atsign-foundation/at_talk.git
    git remote set-url upstream --push DISABLED
    ```
 
    Running `git remote -v` should give something similar to:
 
    ```text
-   origin  git@github.com:yourname/sshnoports.git (fetch)
-   origin  git@github.com:yourname/sshnoports.git (push)
-   upstream        git@github.com:atsign-foundation/sshnoports.git (fetch)
+   origin  git@github.com:yourname/at_talk.git (fetch)
+   origin  git@github.com:yourname/at_talk.git (push)
+   upstream        git@github.com:atsign-foundation/at_talk.git (fetch)
    upstream        DISABLED (push)
    ```
 
