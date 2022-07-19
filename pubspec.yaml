@@ -11,7 +11,7 @@ dependency_overrides:
     git:
       url: https://github.com/atsign-foundation/at_client_sdk.git
       path: at_client
-      ref: OutOfOrderNotifications
+      ref: RemoveNetworkCheckFrom_AtClientImpl_notify
 
 dependencies:
   at_client: ^3.0.30

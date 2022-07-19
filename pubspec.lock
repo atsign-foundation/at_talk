@@ -54,8 +54,8 @@ packages:
     dependency: "direct main"
     description:
       path: at_client
-      ref: OutOfOrderNotifications
-      resolved-ref: "541954e4ef7bbe071bbc4cddc62b3e20cde1d55c"
+      ref: RemoveNetworkCheckFrom_AtClientImpl_notify
+      resolved-ref: b62268520ffe4574443389e0f0ae039c07a1b5b5
       url: "https://github.com/atsign-foundation/at_client_sdk.git"
     source: git
     version: "3.0.30"

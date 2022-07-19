@@ -82,7 +82,7 @@ Future<void> atTalk(List<String> args) async {
   }
 
 // Now on to the @platform startup
-  AtSignLogger.root_level = 'SHOUT';
+  AtSignLogger.root_level = 'SEVERE';
   if (results['verbose']) {
     _logger.logger.level = Level.INFO;
 
@@ -162,6 +162,7 @@ Future<void> atTalk(List<String> args) async {
   var lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
 
   bool firstSend = true;
+  int pendingSend = 0;
   await for (final l in lines) {
     input = l;
     if (input == '/exit') {
@@ -185,19 +186,27 @@ Future<void> atTalk(List<String> args) async {
       ..metadata = metaData;
     if (!(input == "")) {
       try {
+        pendingSend++;
+
         if (firstSend) {
           await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
-            _logger.warning('SUCCESS:' + notification.toString());
+            _logger.info('SUCCESS:' + notification.toString());
           }, onError: (notification) {
-            _logger.severe('ERROR:' + notification.toString());
+            _logger.info('ERROR:' + notification.toString());
+          }, onSentToSecondary: (notification) {
+            _logger.info('SENT:' + notification.toString());
+            pendingSend--;
           });
 
           firstSend = false;
         } else {
           notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
-            _logger.warning('SUCCESS:' + notification.toString());
+            _logger.info('SUCCESS:' + notification.toString());
           }, onError: (notification) {
-            _logger.severe('ERROR:' + notification.toString());
+            _logger.info('ERROR:' + notification.toString());
+          }, onSentToSecondary: (notification) {
+            _logger.info('SENT:' + notification.toString());
+            pendingSend--;
           });
         }
       } catch (e) {
@@ -206,5 +215,10 @@ Future<void> atTalk(List<String> args) async {
     }
   }
 
+  while (pendingSend > 0) {
+    await Future.delayed(Duration(milliseconds: 50));
+  }
+
+  exit(0);
 }
 
