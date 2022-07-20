@@ -161,7 +161,6 @@ Future<void> atTalk(List<String> args) async {
 
   var lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
 
-  bool firstSend = true;
   int pendingSend = 0;
   await for (final l in lines) {
     input = l;
@@ -188,27 +187,14 @@ Future<void> atTalk(List<String> args) async {
       try {
         pendingSend++;
 
-        if (firstSend) {
-          await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
-            _logger.info('SUCCESS:' + notification.toString());
-          }, onError: (notification) {
-            _logger.info('ERROR:' + notification.toString());
-          }, onSentToSecondary: (notification) {
-            _logger.info('SENT:' + notification.toString());
-            pendingSend--;
-          });
-
-          firstSend = false;
-        } else {
-          notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
-            _logger.info('SUCCESS:' + notification.toString());
-          }, onError: (notification) {
-            _logger.info('ERROR:' + notification.toString());
-          }, onSentToSecondary: (notification) {
-            _logger.info('SENT:' + notification.toString());
-            pendingSend--;
-          });
-        }
+        await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
+          _logger.info('SUCCESS:' + notification.toString());
+        }, onError: (notification) {
+          _logger.info('ERROR:' + notification.toString());
+        }, onSentToSecondary: (notification) {
+          _logger.info('SENT:' + notification.toString());
+          pendingSend--;
+        }, checkForFinalDeliveryStatus: false);
       } catch (e) {
         _logger.severe(e.toString());
       }

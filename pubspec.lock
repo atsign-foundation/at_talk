@@ -21,7 +21,7 @@ packages:
       name: archive
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "3.3.0"
+    version: "3.3.1"
   args:
     dependency: transitive
     description:
@@ -55,7 +55,7 @@ packages:
     description:
       path: at_client
       ref: RemoveNetworkCheckFrom_AtClientImpl_notify
-      resolved-ref: b62268520ffe4574443389e0f0ae039c07a1b5b5
+      resolved-ref: d66af748d27336512ce3ff63f9a22868cfadbcc6
       url: "https://github.com/atsign-foundation/at_client_sdk.git"
     source: git
     version: "3.0.30"
