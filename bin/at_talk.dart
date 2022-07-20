@@ -147,7 +147,7 @@ Future<void> atTalk(List<String> args) async {
     if (keyAtsign == 'attalk') {
       _logger.info('atTalk update received from ' + notification.from + ' notification id : ' + notification.id);
       var talk = notification.value!;
-      print(chalk.brightGreen.dim.onBlack('\r$toAtsign: ') + chalk.brightGreen(talk));
+      print(chalk.brightGreen.bold('\r$toAtsign: ') + chalk.brightGreen(talk));
       
       pipePrint('$fromAtsign: ');
     }
