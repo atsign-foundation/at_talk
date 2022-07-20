@@ -26,3 +26,7 @@ atTalk can take pipes! Yes you can pipe output to a chat session, which is a coo
 or
 
 `tail -f ~/myfile.log | dart bin/at_talk.dart -a "@colin" -t "@kevin"`
+
+## Demo
+
+[![asciicast](https://asciinema.org/a/nzIIKLCkMTBUOWVqKk3TckClc.svg)](https://asciinema.org/a/nzIIKLCkMTBUOWVqKk3TckClc)
