@@ -194,7 +194,7 @@ Future<void> atTalk(List<String> args) async {
         }, onSentToSecondary: (notification) {
           _logger.info('SENT:' + notification.toString());
           pendingSend--;
-        }, checkForFinalDeliveryStatus: false);
+        }, waitForFinalDeliveryStatus: false);
       } catch (e) {
         _logger.severe(e.toString());
       }
