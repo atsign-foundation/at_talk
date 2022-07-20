@@ -33,7 +33,7 @@ void main(List<String> args) async {
 Future<void> atTalk(List<String> args) async {
   final AtSignLogger _logger = AtSignLogger(' atTalk ');
   _logger.hierarchicalLoggingEnabled = true;
-  _logger.logger.level = Level.WARNING;
+  _logger.logger.level = Level.SHOUT;
 
   var parser = ArgParser();
 // Args
