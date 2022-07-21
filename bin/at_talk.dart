@@ -18,8 +18,6 @@ import 'package:at_talk/home_directory.dart';
 import 'package:at_talk/check_file_exists.dart';
 
 void main(List<String> args) async {
-
-
   //starting secondary in a zone
   var logger = AtSignLogger('atTalk sender ');
   runZonedGuarded(() async {
@@ -147,8 +145,8 @@ Future<void> atTalk(List<String> args) async {
     if (keyAtsign == 'attalk') {
       _logger.info('atTalk update received from ' + notification.from + ' notification id : ' + notification.id);
       var talk = notification.value!;
-      print(chalk.brightGreen.bold('\r$toAtsign: ') + chalk.brightGreen(talk));
-      
+      print(chalk.brightGreen.bold('\r${notification.from}: ') + chalk.brightGreen(talk));
+
       pipePrint('$fromAtsign: ');
     }
   }),
@@ -157,8 +155,6 @@ Future<void> atTalk(List<String> args) async {
   String input = "";
   pipePrint('$fromAtsign: ');
 
-
-
   var lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
 
   int pendingSend = 0;
@@ -166,6 +162,11 @@ Future<void> atTalk(List<String> args) async {
     input = l;
     if (input == '/exit') {
       exit(0);
+    }
+    if (input.startsWith(RegExp('^/@'))) {
+      toAtsign = input.replaceFirst(RegExp('^/'), '');
+      print('now talking to: $toAtsign');
+      input = '';
     }
 
     pipePrint('$fromAtsign: ');
@@ -187,7 +188,7 @@ Future<void> atTalk(List<String> args) async {
       try {
         pendingSend++;
 
-         await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
+        await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
           _logger.info('SUCCESS:' + notification.toString());
         }, onError: (notification) {
           _logger.info('ERROR:' + notification.toString());
@@ -207,4 +208,3 @@ Future<void> atTalk(List<String> args) async {
 
   exit(0);
 }
-
