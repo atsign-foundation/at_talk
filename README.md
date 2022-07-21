@@ -6,7 +6,7 @@ atTalk is a very simple end-to-end-encrypted command line chat client in homage 
 
 ## Usage
 
-You need to put your @<your atsign>.atKeys file in ~/.atsign/keys and then run the dart program detailing your and the remote atSign you want to chat with.
+You need to put your @<your atSign>.atKeys file in ~/.atsign/keys and then run the dart program detailing your atSign and the remote atSign you want to chat with.
 
 e.g.
 
