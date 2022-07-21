@@ -2,7 +2,7 @@
 
 # atTalk 
 
-atTalk is a very simple end-to-end-encrypted command line chat client in hommage to Unix talk.
+atTalk is a very simple end-to-end-encrypted command line chat client in homage to Unix talk.
 
 ## Usage
 
