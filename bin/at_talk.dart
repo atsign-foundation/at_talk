@@ -51,7 +51,7 @@ Future<void> atTalk(List<String> args) async {
   String fromAtsign = 'unknown';
   String toAtsign = 'unknown';
   String? homeDirectory = getHomeDirectory();
-  String nameSpace = 'ai6bh';
+  String nameSpace = 'attalk';
   String rootDomain = 'root.atsign.org';
 
   try {
@@ -187,7 +187,7 @@ Future<void> atTalk(List<String> args) async {
       try {
         pendingSend++;
 
-        await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
+         await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
           _logger.info('SUCCESS:' + notification.toString());
         }, onError: (notification) {
           _logger.info('ERROR:' + notification.toString());
