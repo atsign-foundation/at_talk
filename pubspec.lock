@@ -7,14 +7,14 @@ packages:
       name: _fe_analyzer_shared
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "41.0.0"
+    version: "42.0.0"
   analyzer:
     dependency: transitive
     description:
       name: analyzer
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "4.2.0"
+    version: "4.3.0"
   archive:
     dependency: transitive
     description:
@@ -54,8 +54,8 @@ packages:
     dependency: "direct main"
     description:
       path: at_client
-      ref: RemoveNetworkCheckFrom_AtClientImpl_notify
-      resolved-ref: d66af748d27336512ce3ff63f9a22868cfadbcc6
+      ref: trunk
+      resolved-ref: "531cd25470409d9894fb4cd78ff60e07fbb60b4e"
       url: "https://github.com/atsign-foundation/at_client_sdk.git"
     source: git
     version: "3.0.30"
@@ -65,14 +65,14 @@ packages:
       name: at_commons
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "3.0.19"
+    version: "3.0.20"
   at_lookup:
     dependency: transitive
     description:
       name: at_lookup
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "3.0.27"
+    version: "3.0.28"
   at_onboarding_cli:
     dependency: "direct main"
     description:
@@ -86,7 +86,7 @@ packages:
       name: at_persistence_secondary_server
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "3.0.29"
+    version: "3.0.30"
   at_persistence_spec:
     dependency: transitive
     description:
@@ -422,7 +422,7 @@ packages:
       name: source_span
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.9.0"
+    version: "1.9.1"
   stack_trace:
     dependency: transitive
     description:
@@ -492,7 +492,7 @@ packages:
       name: vm_service
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "9.0.0"
+    version: "9.3.0"
   watcher:
     dependency: transitive
     description:
