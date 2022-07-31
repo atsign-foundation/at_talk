@@ -104,6 +104,9 @@ Future<void> atTalk(List<String> args) async {
     ..commitLogPath = '$homeDirectory/.$nameSpace/$fromAtsign/storage/commitLog'
     //..cramSecret = '<your cram secret>';
     ..rootDomain = rootDomain
+    ..tlsKeysSavePath = '$homeDirectory/.tls/tlskeys'
+    ..pathToCerts = '$homeDirectory/.tls/rootcacert.pem'
+    ..decryptPackets = true
     ..atKeysFilePath = atsignFile;
 
   AtOnboardingService onboardingService =

@@ -7,13 +7,11 @@ environment:
   sdk: '>=2.17.3 <3.0.0'
 
 dependency_overrides:
-#  at_client:
-#    path: ../at_client_sdk/at_client
-  # at_client:
-  #   git:
-  #     url: https://github.com/atsign-foundation/at_client_sdk.git
-  #     path: at_client
-  #     ref: trunk
+  at_lookup:
+      git:
+         url: https://github.com/atsign-foundation/at_libraries.git
+         path: at_lookup
+         ref: tlsdump
 
 dependencies:
   at_client: ^3.0.30
