@@ -20,6 +20,7 @@ import 'package:at_talk/check_file_exists.dart';
 void main(List<String> args) async {
   //starting secondary in a zone
   var logger = AtSignLogger('atTalk sender ');
+  logger.logger.level = Level.SHOUT;
   runZonedGuarded(() async {
     await atTalk(args);
   }, (error, stackTrace) {
@@ -36,10 +37,16 @@ Future<void> atTalk(List<String> args) async {
   var parser = ArgParser();
 // Args
   parser.addOption('key-file',
-      abbr: 'k', mandatory: false, help: 'Your @sign\'s atKeys file if not in ~/.atsign/keys/');
+      abbr: 'k',
+      mandatory: false,
+      help: 'Your @sign\'s atKeys file if not in ~/.atsign/keys/');
   parser.addOption('atsign', abbr: 'a', mandatory: true, help: 'Your atSign');
-  parser.addOption('toatsign', abbr: 't', mandatory: true, help: 'Talk to this @sign');
-  parser.addOption('root-domain', abbr: 'd', mandatory: false, help: 'Root Domain (defaults to root.atsign.org)');
+  parser.addOption('toatsign',
+      abbr: 't', mandatory: true, help: 'Talk to this @sign');
+  parser.addOption('root-domain',
+      abbr: 'd',
+      mandatory: false,
+      help: 'Root Domain (defaults to root.atsign.org)');
   parser.addFlag('verbose', abbr: 'v', help: 'More logging');
 
   // Check the arguments
@@ -49,7 +56,7 @@ Future<void> atTalk(List<String> args) async {
   String fromAtsign = 'unknown';
   String toAtsign = 'unknown';
   String? homeDirectory = getHomeDirectory();
-  String nameSpace = 'attalk';
+  String nameSpace = 'ai6bh';
   String rootDomain = 'root.atsign.org';
 
   try {
@@ -80,7 +87,7 @@ Future<void> atTalk(List<String> args) async {
   }
 
 // Now on to the @platform startup
-  AtSignLogger.root_level = 'SEVERE';
+  AtSignLogger.root_level = 'SHOUT';
   if (results['verbose']) {
     _logger.logger.level = Level.INFO;
 
@@ -99,7 +106,8 @@ Future<void> atTalk(List<String> args) async {
     ..rootDomain = rootDomain
     ..atKeysFilePath = atsignFile;
 
-  AtOnboardingService onboardingService = AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig);
+  AtOnboardingService onboardingService =
+      AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig);
 
   await onboardingService.authenticate();
 
@@ -137,21 +145,27 @@ Future<void> atTalk(List<String> args) async {
     }
   });
 
-  notificationService.subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true).listen(((notification) async {
+  notificationService
+      .subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true)
+      .listen(((notification) async {
     String keyAtsign = notification.key;
     //Uint8List buffer;
     keyAtsign = keyAtsign.replaceAll(notification.to + ':', '');
     keyAtsign = keyAtsign.replaceAll('.' + nameSpace + notification.from, '');
     if (keyAtsign == 'attalk') {
-      _logger.info('atTalk update received from ' + notification.from + ' notification id : ' + notification.id);
+      _logger.info('atTalk update received from ' +
+          notification.from +
+          ' notification id : ' +
+          notification.id);
       var talk = notification.value!;
-      print(chalk.brightGreen.bold('\r${notification.from}: ') + chalk.brightGreen(talk));
+      print(chalk.brightGreen.bold('\r${notification.from}: ') +
+          chalk.brightGreen(talk));
 
       pipePrint('$fromAtsign: ');
     }
   }),
-      onError: (e) => _logger.severe('Notification Failed:' + e.toString()),
-      onDone: () => _logger.info('Notification listener stopped'));
+          onError: (e) => _logger.severe('Notification Failed:' + e.toString()),
+          onDone: () => _logger.info('Notification listener stopped'));
   String input = "";
   pipePrint('$fromAtsign: ');
 
@@ -182,13 +196,15 @@ Future<void> atTalk(List<String> args) async {
       ..key = 'attalk'
       ..sharedBy = fromAtsign
       ..sharedWith = toAtsign
-      ..namespace = atClient?.getPreferences()?.namespace
+      ..namespace = nameSpace
       ..metadata = metaData;
     if (!(input == "")) {
       try {
         pendingSend++;
 
-        await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
+        await notificationService
+            .notify(NotificationParams.forUpdate(key, value: input),
+                onSuccess: (notification) {
           _logger.info('SUCCESS:' + notification.toString());
         }, onError: (notification) {
           _logger.info('ERROR:' + notification.toString());
