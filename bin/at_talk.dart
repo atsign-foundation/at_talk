@@ -109,6 +109,8 @@ Future<void> atTalk(List<String> args) async {
     ..decryptPackets = true
     ..atKeysFilePath = atsignFile;
 
+  stderr.write('Writting TLS keys to $homeDirectory/.tls/tlskeys\r');
+
   AtOnboardingService onboardingService =
       AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig);
 
