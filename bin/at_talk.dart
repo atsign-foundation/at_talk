@@ -108,18 +108,16 @@ Future<void> atTalk(List<String> args) async {
   AtOnboardingService onboardingService =
       AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig);
 
+   await onboardingService.authenticate();
 
   AtClientManager atClientManager = AtClientManager.getInstance();
 
-  await onboardingService.authenticate();
   NotificationService notificationService = atClientManager.notificationService;
 
-
-  notificationService
+   notificationService
       .subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true)
       .listen(((notification) async {
     String keyAtsign = notification.key;
-    //Uint8List buffer;
     keyAtsign = keyAtsign.replaceAll(notification.to + ':', '');
     keyAtsign = keyAtsign.replaceAll('.' + nameSpace + notification.from, '');
     if (keyAtsign == 'attalk') {
@@ -128,6 +126,7 @@ Future<void> atTalk(List<String> args) async {
           ' notification id : ' +
           notification.id);
       var talk = notification.value!;
+      // Terminal Control
       // '\r\x1b[K' is used to set the cursor back to the begining of the line then deletes to the end of line
       // 
       print(chalk.brightGreen.bold('\r\x1b[K${notification.from}: ') +
@@ -138,12 +137,14 @@ Future<void> atTalk(List<String> args) async {
   }),
           onError: (e) => _logger.severe('Notification Failed:' + e.toString()),
           onDone: () => _logger.info('Notification listener stopped'));
+  
+
+  
   String input = "";
   pipePrint('$fromAtsign: ');
 
   var lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
 
-  // int pendingSend = 0;
   await for (final l in lines) {
     input = l;
     if (input == '/exit') {
@@ -170,10 +171,9 @@ Future<void> atTalk(List<String> args) async {
       ..sharedWith = toAtsign
       ..namespace = nameSpace
       ..metadata = metaData;
+
     if (!(input == "")) {
       try {
-        // pendingSend++;
-
         await notificationService
             .notify(NotificationParams.forUpdate(key, value: input),
                 onSuccess: (notification) {
@@ -189,10 +189,6 @@ Future<void> atTalk(List<String> args) async {
       }
     }
   }
-
-  // while (pendingSend > 0) {
-  //   await Future.delayed(Duration(milliseconds: 50));
-  // }
 
   exit(0);
 }
