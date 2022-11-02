@@ -96,54 +96,24 @@ Future<void> atTalk(List<String> args) async {
 
   //onboarding preference builder can be used to set onboardingService parameters
   AtOnboardingPreference atOnboardingConfig = AtOnboardingPreference()
-    //..qrCodePath = 'etc/qrcode_blueamateurbinding.png'
     ..hiveStoragePath = '$homeDirectory/.$nameSpace/$fromAtsign/storage'
     ..namespace = nameSpace
     ..downloadPath = '$homeDirectory/.$nameSpace/files'
     ..isLocalStoreRequired = true
     ..commitLogPath = '$homeDirectory/.$nameSpace/$fromAtsign/storage/commitLog'
-    //..cramSecret = '<your cram secret>';
     ..rootDomain = rootDomain
+    ..fetchOfflineNotifications = true
     ..atKeysFilePath = atsignFile;
 
   AtOnboardingService onboardingService =
       AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig);
 
-  await onboardingService.authenticate();
-
-  AtClient? atClient = await onboardingService.getAtClient();
-
-  // var atClient = await onboardingService.getAtClient();
 
   AtClientManager atClientManager = AtClientManager.getInstance();
 
+  await onboardingService.authenticate();
   NotificationService notificationService = atClientManager.notificationService;
 
-  bool syncComplete = false;
-  void onSyncDone(syncResult) {
-    _logger.info("syncResult.syncStatus: ${syncResult.syncStatus}");
-    _logger.info("syncResult.lastSyncedOn ${syncResult.lastSyncedOn}");
-    syncComplete = true;
-  }
-
-  // Wait for initial sync to complete
-  _logger.info("Waiting for initial sync");
-  stdout.write("Syncing your data.");
-  syncComplete = false;
-  atClientManager.syncService.sync(onDone: onSyncDone);
-  while (!syncComplete) {
-    await Future.delayed(Duration(milliseconds: 500));
-    stdout.write(".");
-  }
-  print('');
-// Keep an eye on connectivity and report failures if we see them
-  ConnectivityListener().subscribe().listen((isConnected) {
-    if (isConnected) {
-      _logger.warning('connection available');
-    } else {
-      _logger.warning('connection lost');
-    }
-  });
 
   notificationService
       .subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true)
@@ -158,8 +128,10 @@ Future<void> atTalk(List<String> args) async {
           ' notification id : ' +
           notification.id);
       var talk = notification.value!;
-      print(chalk.brightGreen.bold('\r${notification.from}: ') +
-          chalk.brightGreen(talk));
+      // '\r\x1b[K' is used to set the cursor back to the begining of the line then deletes to the end of line
+      // 
+      print(chalk.brightGreen.bold('\r\x1b[K${notification.from}: ') +
+          chalk.brightGreen(talk) );
 
       pipePrint('$fromAtsign: ');
     }
@@ -171,7 +143,7 @@ Future<void> atTalk(List<String> args) async {
 
   var lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
 
-  int pendingSend = 0;
+  // int pendingSend = 0;
   await for (final l in lines) {
     input = l;
     if (input == '/exit') {
@@ -200,7 +172,7 @@ Future<void> atTalk(List<String> args) async {
       ..metadata = metaData;
     if (!(input == "")) {
       try {
-        pendingSend++;
+        // pendingSend++;
 
         await notificationService
             .notify(NotificationParams.forUpdate(key, value: input),
@@ -210,7 +182,7 @@ Future<void> atTalk(List<String> args) async {
           _logger.info('ERROR:' + notification.toString());
         }, onSentToSecondary: (notification) {
           _logger.info('SENT:' + notification.toString());
-          pendingSend--;
+          // pendingSend--;
         }, waitForFinalDeliveryStatus: false);
       } catch (e) {
         _logger.severe(e.toString());
@@ -218,9 +190,9 @@ Future<void> atTalk(List<String> args) async {
     }
   }
 
-  while (pendingSend > 0) {
-    await Future.delayed(Duration(milliseconds: 50));
-  }
+  // while (pendingSend > 0) {
+  //   await Future.delayed(Duration(milliseconds: 50));
+  // }
 
   exit(0);
 }
