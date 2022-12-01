@@ -47,6 +47,10 @@ Future<void> atTalk(List<String> args) async {
       abbr: 'd',
       mandatory: false,
       help: 'Root Domain (defaults to root.atsign.org)');
+    parser.addOption('root-port',
+      abbr: 'p',
+      mandatory: false,
+      help: 'Root port (defaults to 64)');
   parser.addFlag('verbose', abbr: 'v', help: 'More logging');
 
   // Check the arguments
@@ -58,6 +62,7 @@ Future<void> atTalk(List<String> args) async {
   String? homeDirectory = getHomeDirectory();
   String nameSpace = 'ai6bh';
   String rootDomain = 'root.atsign.org';
+  int rootPort = 64;
 
   try {
     // Arg check
@@ -68,6 +73,10 @@ Future<void> atTalk(List<String> args) async {
 
     if (results['root-domain'] != null) {
       rootDomain = results['root-domain'];
+    }
+
+    if (results['root-port'] != null) {
+      rootPort = int.parse(results['root-port']);
     }
 
     if (results['key-file'] != null) {
@@ -104,6 +113,7 @@ Future<void> atTalk(List<String> args) async {
     ..commitLogPath = '$homeDirectory/.$nameSpace/$fromAtsign/storage/commitLog'
     //..cramSecret = '<your cram secret>';
     ..rootDomain = rootDomain
+    ..rootPort = rootPort
     ..atKeysFilePath = atsignFile;
 
   AtOnboardingService onboardingService =
