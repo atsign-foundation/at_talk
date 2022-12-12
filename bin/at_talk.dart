@@ -159,7 +159,7 @@ Future<void> atTalk(List<String> args) async {
 
     if (!(input == "")) {
       var success = await sendNotification(notificationService, key, input, _logger);
-      if(!success){
+      if(! success){
              print(chalk.brightRed.bold('\r\x1b[KError Sending: ') + '"' + input + '"' + ' to $toAtsign - unable to reach the Internet !');
              pipePrint('$fromAtsign: ');
       }
