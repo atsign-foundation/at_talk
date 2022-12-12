@@ -101,13 +101,14 @@ Future<void> atTalk(List<String> args) async {
 
   AtOnboardingService onboardingService = AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig);
   bool onboarded = false;
+  AtClientManager atClientManager;
+  late NotificationService notificationService;
   while (!onboarded) {
     onboarded = await onboardingService.authenticate();
+    atClientManager = AtClientManager.getInstance();
+    notificationService = atClientManager.notificationService;
   }
 
-  AtClientManager atClientManager = AtClientManager.getInstance();
-
-  NotificationService notificationService = atClientManager.notificationService;
 
   notificationService.subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true).listen(((notification) async {
     String keyAtsign = notification.key;
