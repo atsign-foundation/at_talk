@@ -131,6 +131,7 @@ Future<void> atTalk(List<String> args) async {
   var lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
 
   await for (final l in lines) {
+    pipePrint('$fromAtsign: ');
     input = l;
     if (input == '/exit') {
       exit(0);
@@ -141,7 +142,6 @@ Future<void> atTalk(List<String> args) async {
       input = '';
     }
 
-    pipePrint('$fromAtsign: ');
 
     var metaData = Metadata()
       ..isPublic = false
@@ -158,8 +158,8 @@ Future<void> atTalk(List<String> args) async {
       ..metadata = metaData;
 
     if (!(input == "")) {
-      var success = await sendNotification(notificationService, key, input, _logger);
-      if(! success){
+      var success =  sendNotification(notificationService, key, input, _logger);
+      if(! await success){
              print(chalk.brightRed.bold('\r\x1b[KError Sending: ') + '"' + input + '"' + ' to $toAtsign - unable to reach the Internet !');
              pipePrint('$fromAtsign: ');
       }
@@ -190,7 +190,7 @@ Future<bool> sendNotification(
       _logger.severe(e.toString());
     }
     // back off retrys (max 3)
-    await Future.delayed(Duration(milliseconds: (500 * (retry * retry))));
+    await Future.delayed(Duration(milliseconds: (500 * (retry))));
   }
   return (success);
 }
