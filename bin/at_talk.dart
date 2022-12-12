@@ -100,8 +100,10 @@ Future<void> atTalk(List<String> args) async {
     ..atKeysFilePath = atsignFile;
 
   AtOnboardingService onboardingService = AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig);
-
-  await onboardingService.authenticate();
+  bool onboarded = false;
+  while (!onboarded) {
+    onboarded = await onboardingService.authenticate();
+  }
 
   AtClientManager atClientManager = AtClientManager.getInstance();
 
@@ -142,7 +144,6 @@ Future<void> atTalk(List<String> args) async {
       input = '';
     }
 
-
     var metaData = Metadata()
       ..isPublic = false
       ..isEncrypted = true
@@ -158,10 +159,14 @@ Future<void> atTalk(List<String> args) async {
       ..metadata = metaData;
 
     if (!(input == "")) {
-      var success =  sendNotification(notificationService, key, input, _logger);
-      if(! await success){
-             print(chalk.brightRed.bold('\r\x1b[KError Sending: ') + '"' + input + '"' + ' to $toAtsign - unable to reach the Internet !');
-             pipePrint('$fromAtsign: ');
+      var success = sendNotification(notificationService, key, input, _logger);
+      if (!await success) {
+        print(chalk.brightRed.bold('\r\x1b[KError Sending: ') +
+            '"' +
+            input +
+            '"' +
+            ' to $toAtsign - unable to reach the Internet !');
+        pipePrint('$fromAtsign: ');
       }
     }
   }
