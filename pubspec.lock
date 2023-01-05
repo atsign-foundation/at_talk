@@ -50,6 +50,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.0.0"
+  at_chops:
+    dependency: transitive
+    description:
+      name: at_chops
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "1.0.0"
   at_client:
     dependency: "direct main"
     description:
@@ -65,12 +72,14 @@ packages:
     source: hosted
     version: "3.0.32"
   at_lookup:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
-      name: at_lookup
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "3.0.33"
+      path: "packages/at_lookup"
+      ref: gkc-debugging-branch
+      resolved-ref: "227d495c4eb0cd018295446f16c7736357723b34"
+      url: "https://github.com/atsign-foundation/at_libraries.git"
+    source: git
+    version: "3.0.34"
   at_onboarding_cli:
     dependency: "direct main"
     description:
@@ -534,4 +543,4 @@ packages:
     source: hosted
     version: "0.1.1"
 sdks:
-  dart: ">=2.18.0 <3.0.0"
+  dart: ">=2.18.3 <3.0.0"
