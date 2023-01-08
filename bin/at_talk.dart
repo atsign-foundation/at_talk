@@ -103,14 +103,22 @@ Future<void> atTalk(List<String> args) async {
   bool onboarded = false;
   AtClientManager atClientManager;
   late NotificationService notificationService;
+  Duration retryDuration = Duration(seconds: 3);
   while (!onboarded) {
-    var onboard = await onboardingService.authenticate();
-    atClientManager = AtClientManager.getInstance();
-    notificationService = atClientManager.notificationService;
-    if (onboard) {
-      onboarded = true;
+    try {
+      stdout.write(chalk.brightBlue('\r\x1b[KConnecting ... '));
+      await Future.delayed(Duration(milliseconds: 1000)); // Pause just long enough for the retry to be visible
+      onboarded = await onboardingService.authenticate();
+    } catch (exception) {
+      stdout.write(chalk.brightRed('$exception. Will retry in ${retryDuration.inSeconds} seconds'));
+    }
+    if (!onboarded) {
+      await Future.delayed(retryDuration);
     }
   }
+  stdout.writeln(chalk.brightGreen('Connected'));
+  atClientManager = AtClientManager.getInstance();
+  notificationService = atClientManager.notificationService;
 
   notificationService.subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true).listen(((notification) async {
     String keyAtsign = notification.key;
@@ -120,7 +128,7 @@ Future<void> atTalk(List<String> args) async {
       _logger.info('atTalk update received from ' + notification.from + ' notification id : ' + notification.id);
       var talk = notification.value!;
       // Terminal Control
-      // '\r\x1b[K' is used to set the cursor back to the begining of the line then deletes to the end of line
+      // '\r\x1b[K' is used to set the cursor back to the beginning of the line then deletes to the end of line
       //
       print(chalk.brightGreen.bold('\r\x1b[K${notification.from}: ') + chalk.brightGreen(talk));
 
@@ -197,7 +205,7 @@ Future<bool> sendNotification(
     } catch (e) {
       _logger.severe(e.toString());
     }
-    // back off retrys (max 3)
+    // back off retries (max 3)
     await Future.delayed(Duration(milliseconds: (500 * (retry))));
   }
   return (success);
