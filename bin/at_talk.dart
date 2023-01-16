@@ -102,8 +102,6 @@ Future<void> atTalk(List<String> args) async {
 
   AtOnboardingService onboardingService = AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig);
   bool onboarded = false;
-  AtClientManager atClientManager;
-  late NotificationService notificationService;
   Duration retryDuration = Duration(seconds: 3);
   while (!onboarded) {
     try {
@@ -118,10 +116,11 @@ Future<void> atTalk(List<String> args) async {
     }
   }
   stdout.writeln(chalk.brightGreen('Connected'));
-  atClientManager = AtClientManager.getInstance();
-  notificationService = atClientManager.notificationService;
 
-  notificationService.subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true).listen(((notification) async {
+  // Current atClient is the one which the onboardingService just authenticated
+  AtClient atClient = AtClientManager.getInstance().atClient;
+
+  atClient.notificationService.subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true).listen(((notification) async {
     String keyAtsign = notification.key;
     keyAtsign = keyAtsign.replaceAll(notification.to + ':', '');
     keyAtsign = keyAtsign.replaceAll('.' + nameSpace + notification.from, '');
@@ -171,7 +170,7 @@ Future<void> atTalk(List<String> args) async {
       ..metadata = metaData;
 
     if (!(input == "")) {
-      var success = sendNotification(notificationService, key, input, _logger);
+      var success = sendNotification(atClient.notificationService, key, input, _logger);
       if (!await success) {
         print(chalk.brightRed.bold('\r\x1b[KError Sending: ') +
             '"' +
