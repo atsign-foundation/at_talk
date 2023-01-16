@@ -60,11 +60,9 @@ packages:
   at_client:
     dependency: "direct main"
     description:
-      path: "packages/at_client"
-      ref: gkc-inject-atChops-into-RemoteSecondary
-      resolved-ref: "89d28970a98e511dd98169640acb91e9bb29536c"
-      url: "https://github.com/atsign-foundation/at_client_sdk.git"
-    source: git
+      name: at_client
+      url: "https://pub.dartlang.org"
+    source: hosted
     version: "3.0.52"
   at_commons:
     dependency: transitive
@@ -85,12 +83,10 @@ packages:
   at_onboarding_cli:
     dependency: "direct main"
     description:
-      path: "packages/at_onboarding_cli"
-      ref: onboarding_cli_uptake_atchops
-      resolved-ref: "9cf6f3373aab8d03484d9fef369e9d290fcead60"
-      url: "https://github.com/atsign-foundation/at_libraries.git"
-    source: git
-    version: "1.2.2"
+      name: at_onboarding_cli
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "1.2.3"
   at_persistence_secondary_server:
     dependency: transitive
     description:

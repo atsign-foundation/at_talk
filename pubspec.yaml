@@ -6,8 +6,8 @@ environment:
   sdk: '>=2.17.3 <3.0.0'
 
 dependencies:
-  at_client: ^3.0.30
-  at_onboarding_cli: ^1.0.0
+  at_client: ^3.0.52
+  at_onboarding_cli: ^1.2.3
   chalkdart: ^2.0.8
 
 dev_dependencies:
@@ -20,13 +20,3 @@ dependency_overrides:
       url: https://github.com/atsign-foundation/at_libraries.git
       path: packages/at_lookup
       ref: gkc-debugging-branch
-  at_onboarding_cli:
-    git:
-      url: https://github.com/atsign-foundation/at_libraries.git
-      path: packages/at_onboarding_cli
-      ref: onboarding_cli_uptake_atchops
-  at_client:
-    git:
-      url: https://github.com/atsign-foundation/at_client_sdk.git
-      path: packages/at_client
-      ref: gkc-inject-atChops-into-RemoteSecondary
