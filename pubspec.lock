@@ -7,14 +7,14 @@ packages:
       name: _fe_analyzer_shared
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "51.0.0"
+    version: "52.0.0"
   analyzer:
     dependency: transitive
     description:
       name: analyzer
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "5.3.1"
+    version: "5.4.0"
   archive:
     dependency: transitive
     description:
@@ -60,47 +60,51 @@ packages:
   at_client:
     dependency: "direct main"
     description:
-      name: at_client
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "3.0.48"
+      path: "packages/at_client"
+      ref: gkc-inject-atChops-into-RemoteSecondary
+      resolved-ref: "89d28970a98e511dd98169640acb91e9bb29536c"
+      url: "https://github.com/atsign-foundation/at_client_sdk.git"
+    source: git
+    version: "3.0.52"
   at_commons:
     dependency: transitive
     description:
       name: at_commons
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "3.0.32"
+    version: "3.0.34"
   at_lookup:
     dependency: "direct overridden"
     description:
       path: "packages/at_lookup"
       ref: gkc-debugging-branch
-      resolved-ref: "227d495c4eb0cd018295446f16c7736357723b34"
+      resolved-ref: "74b0b2807e04620de5268edc58b112b9feb712c5"
       url: "https://github.com/atsign-foundation/at_libraries.git"
     source: git
-    version: "3.0.34"
+    version: "3.0.35"
   at_onboarding_cli:
     dependency: "direct main"
     description:
-      name: at_onboarding_cli
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "1.2.1"
+      path: "packages/at_onboarding_cli"
+      ref: onboarding_cli_uptake_atchops
+      resolved-ref: "9cf6f3373aab8d03484d9fef369e9d290fcead60"
+      url: "https://github.com/atsign-foundation/at_libraries.git"
+    source: git
+    version: "1.2.2"
   at_persistence_secondary_server:
     dependency: transitive
     description:
       name: at_persistence_secondary_server
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "3.0.43"
+    version: "3.0.44"
   at_persistence_spec:
     dependency: transitive
     description:
       name: at_persistence_spec
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "2.0.9"
+    version: "2.0.10"
   at_server_status:
     dependency: transitive
     description:
@@ -170,7 +174,7 @@ packages:
       name: coverage
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.6.1"
+    version: "1.6.2"
   cron:
     dependency: transitive
     description:
@@ -261,14 +265,14 @@ packages:
       name: image
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "3.2.2"
+    version: "3.3.0"
   internet_connection_checker:
     dependency: transitive
     description:
       name: internet_connection_checker
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.0.1+4"
+    version: "1.0.0+1"
   io:
     dependency: transitive
     description:
@@ -303,7 +307,7 @@ packages:
       name: matcher
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.12.13"
+    version: "0.12.14"
   meta:
     dependency: transitive
     description:
@@ -317,7 +321,7 @@ packages:
       name: mime
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.0.3"
+    version: "1.0.4"
   mocktail:
     dependency: transitive
     description:
@@ -464,21 +468,21 @@ packages:
       name: test
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.22.0"
+    version: "1.22.2"
   test_api:
     dependency: transitive
     description:
       name: test_api
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.4.16"
+    version: "0.4.18"
   test_core:
     dependency: transitive
     description:
       name: test_core
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.4.20"
+    version: "0.4.22"
   typed_data:
     dependency: transitive
     description:
@@ -499,7 +503,7 @@ packages:
       name: vm_service
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "9.4.0"
+    version: "10.0.0"
   watcher:
     dependency: transitive
     description:
@@ -513,7 +517,7 @@ packages:
       name: web_socket_channel
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "2.2.0"
+    version: "2.3.0"
   webkit_inspection_protocol:
     dependency: transitive
     description:

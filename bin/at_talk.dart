@@ -97,7 +97,8 @@ Future<void> atTalk(List<String> args) async {
     ..commitLogPath = '$homeDirectory/.$nameSpace/$fromAtsign/storage/commitLog'
     ..rootDomain = rootDomain
     ..fetchOfflineNotifications = true
-    ..atKeysFilePath = atsignFile;
+    ..atKeysFilePath = atsignFile
+    ..useAtChops = true;
 
   AtOnboardingService onboardingService = AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig);
   bool onboarded = false;
