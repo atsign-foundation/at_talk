@@ -8,7 +8,7 @@ import 'package:at_talk/pipe_print.dart';
 import 'package:logging/src/level.dart';
 import 'package:chalkdart/chalk.dart';
 
-// @platform packages
+// atPlatform packages
 import 'package:at_client/at_client.dart';
 import 'package:at_utils/at_logger.dart';
 import 'package:at_onboarding_cli/at_onboarding_cli.dart';
@@ -39,10 +39,10 @@ Future<void> atTalk(List<String> args) async {
   parser.addOption('key-file',
       abbr: 'k',
       mandatory: false,
-      help: 'Your @sign\'s atKeys file if not in ~/.atsign/keys/');
+      help: 'Your atSign\'s atKeys file if not in ~/.atsign/keys/');
   parser.addOption('atsign', abbr: 'a', mandatory: true, help: 'Your atSign');
   parser.addOption('toatsign',
-      abbr: 't', mandatory: true, help: 'Talk to this @sign');
+      abbr: 't', mandatory: true, help: 'Talk to this atSign');
   parser.addOption('root-domain',
       abbr: 'd',
       mandatory: false,
@@ -62,7 +62,7 @@ Future<void> atTalk(List<String> args) async {
   try {
     // Arg check
     results = parser.parse(args);
-    // Find @sign key file
+    // Find atSign key file
     fromAtsign = results['atsign'];
     toAtsign = results['toatsign'];
 
@@ -86,7 +86,7 @@ Future<void> atTalk(List<String> args) async {
     exit(1);
   }
 
-// Now on to the @platform startup
+// Now on to the atPlatform startup
   AtSignLogger.root_level = 'SHOUT';
   if (results['verbose']) {
     _logger.logger.level = Level.INFO;
