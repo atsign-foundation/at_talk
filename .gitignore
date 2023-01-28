@@ -6,3 +6,5 @@
 build/
 # Any .exe
 .exe
+attalk
+pubspec.lock
