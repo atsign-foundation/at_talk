@@ -10,6 +10,10 @@ You need to put your @<your atSign>.atKeys file in ~/.atsign/keys and then run t
 
 e.g.
 
+`dart pub get`
+
+To ensure that dependencies are in place. Then:
+
 `dart bin/at_talk.dart -a "@colin" -t "@kevin"`
 
 The person you want to atTalk with will have to do the same but in reverse
