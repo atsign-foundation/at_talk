@@ -4,3 +4,7 @@
 
 # Conventional directory for build output.
 build/
+# Any .exe
+.exe
+attalk
+pubspec.lock
