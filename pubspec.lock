@@ -76,7 +76,7 @@ packages:
     description:
       path: "packages/at_lookup"
       ref: gkc-debugging-branch
-      resolved-ref: "74b0b2807e04620de5268edc58b112b9feb712c5"
+      resolved-ref: "0a9e9684c1a278ceeac8ddb4eca198fe8810b1ee"
       url: "https://github.com/atsign-foundation/at_libraries.git"
     source: git
     version: "3.0.35"
