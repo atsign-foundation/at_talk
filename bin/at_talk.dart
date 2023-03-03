@@ -193,7 +193,7 @@ Future<void> atTalk(List<String> args) async {
 
 // Send file contents if stdin has no terminal
   if (!(hasTerminal)) {
-    var success = sendNotification(atClient.notificationService, key, ' Sending a file' + buffer, _logger);
+    var success = sendNotification(atClient.notificationService, key, chalk.brightBlue('Sending a file') + chalk.white( buffer), _logger);
     if (!await success) {
       print(chalk.brightRed.bold('\r\x1b[KError Sending: ') +
           '"' +
