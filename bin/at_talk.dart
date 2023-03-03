@@ -41,6 +41,7 @@ Future<void> atTalk(List<String> args) async {
   parser.addOption('atsign', abbr: 'a', mandatory: true, help: 'Your atSign');
   parser.addOption('toatsign', abbr: 't', mandatory: true, help: 'Talk to this @sign');
   parser.addOption('root-domain', abbr: 'd', mandatory: false, help: 'Root Domain (defaults to root.atsign.org)');
+  parser.addOption('namespace', abbr: 'n', mandatory: false, help: 'Namespace (defaults to ai6bh)');
   parser.addFlag('verbose', abbr: 'v', help: 'More logging');
 
   // Check the arguments
@@ -63,6 +64,10 @@ Future<void> atTalk(List<String> args) async {
 
     if (results['root-domain'] != null) {
       rootDomain = results['root-domain'];
+    }
+
+    if (results['namespace'] != null) {
+      nameSpace = results['namespace'];
     }
 
     if (results['key-file'] != null) {
