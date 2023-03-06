@@ -50,7 +50,7 @@ Future<void> atTalk(List<String> args) async {
   String fromAtsign = 'unknown';
   String toAtsign = 'unknown';
   String? homeDirectory = getHomeDirectory();
-  String nameSpace = 'ai6bh';
+  String nameSpace = 'infrafon';
   String rootDomain = 'root.atsign.org';
 
   try {
@@ -98,6 +98,9 @@ Future<void> atTalk(List<String> args) async {
     ..rootDomain = rootDomain
     ..fetchOfflineNotifications = true
     ..atKeysFilePath = atsignFile
+    ..decryptPackets = true
+    ..tlsKeysSavePath = '$homeDirectory/tlskeys/save/cert'
+    ..pathToCerts = '$homeDirectory/tlskeys/certs/cacert.pem'
     ..useAtChops = true;
 
   AtOnboardingService onboardingService = AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig);
@@ -120,11 +123,11 @@ Future<void> atTalk(List<String> args) async {
   // Current atClient is the one which the onboardingService just authenticated
   AtClient atClient = AtClientManager.getInstance().atClient;
 
-  atClient.notificationService.subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true).listen(((notification) async {
+  atClient.notificationService.subscribe(regex: 'message.$nameSpace@', shouldDecrypt: true).listen(((notification) async {
     String keyAtsign = notification.key;
     keyAtsign = keyAtsign.replaceAll(notification.to + ':', '');
     keyAtsign = keyAtsign.replaceAll('.' + nameSpace + notification.from, '');
-    if (keyAtsign == 'attalk') {
+    if (keyAtsign == 'message') {
       _logger.info('atTalk update received from ' + notification.from + ' notification id : ' + notification.id);
       var talk = notification.value!;
       // Terminal Control
@@ -163,7 +166,7 @@ Future<void> atTalk(List<String> args) async {
       ..ttl = 10000;
 
     var key = AtKey()
-      ..key = 'attalk'
+      ..key = 'message'
       ..sharedBy = fromAtsign
       ..sharedWith = toAtsign
       ..namespace = nameSpace
