@@ -124,16 +124,16 @@ Future<void> atTalk(List<String> args) async {
   AtClient atClient = AtClientManager.getInstance().atClient;
 
   atClient.notificationService.subscribe(regex: 'message.$nameSpace@', shouldDecrypt: true).listen(((notification) async {
+    _logger.info('atTalk update received from ' + notification.from + '\n notification id : ' + notification.id + '\n key : ' + notification.key + '\n value : ' + notification.value!);
     String keyAtsign = notification.key;
     keyAtsign = keyAtsign.replaceAll(notification.to + ':', '');
     keyAtsign = keyAtsign.replaceAll('.' + nameSpace + notification.from, '');
     if (keyAtsign == 'message') {
-      _logger.info('atTalk update received from ' + notification.from + ' notification id : ' + notification.id);
-      var talk = notification.value!;
+      final infrafonJson = jsonDecode(notification.value!);
       // Terminal Control
       // '\r\x1b[K' is used to set the cursor back to the beginning of the line then deletes to the end of line
       //
-      print(chalk.brightGreen.bold('\r\x1b[K${notification.from}: ') + chalk.brightGreen(talk));
+      print(chalk.brightGreen.bold('\r\x1b[K${notification.from}: ') + chalk.brightGreen(infrafonJson['app']['HospitalPorter']['availability']));
 
       pipePrint('$fromAtsign: ');
     }
