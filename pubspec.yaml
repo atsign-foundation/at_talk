@@ -6,7 +6,7 @@ environment:
   sdk: '>=2.17.3 <3.0.0'
 
 dependencies:
-  at_client: ^3.0.52
+  at_client: ^3.0.56
   at_onboarding_cli: ^1.2.3
   chalkdart: ^2.0.8
 
@@ -15,8 +15,7 @@ dev_dependencies:
   test: ^1.16.0
 
 dependency_overrides:
-  at_lookup:
-    git:
-      url: https://github.com/atsign-foundation/at_libraries.git
-      path: packages/at_lookup
-      ref: gkc-debugging-branch
+  at_onboarding_cli:
+    path: ../at_libraries/packages/at_onboarding_cli
+  at_client:
+    path: ../at_client_sdk/packages/at_client

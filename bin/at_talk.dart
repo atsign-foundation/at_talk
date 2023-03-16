@@ -5,6 +5,7 @@ import 'dart:async';
 // external packages
 import 'package:args/args.dart';
 import 'package:at_talk/pipe_print.dart';
+import 'package:at_talk/service_factories.dart';
 import 'package:logging/src/level.dart';
 import 'package:chalkdart/chalk.dart';
 
@@ -16,6 +17,9 @@ import 'package:at_onboarding_cli/at_onboarding_cli.dart';
 // Local Packages
 import 'package:at_talk/home_directory.dart';
 import 'package:at_talk/check_file_exists.dart';
+
+const String digits = '0123456789';
+final RegExp generateCommandRegEx = RegExp(r'^/gen \d+$');
 
 void main(List<String> args) async {
   //starting secondary in a zone
@@ -42,9 +46,10 @@ Future<void> atTalk(List<String> args) async {
   parser.addOption('toatsign', abbr: 't', mandatory: true, help: 'Talk to this @sign');
   parser.addOption('root-domain', abbr: 'd', mandatory: false, help: 'Root Domain (defaults to root.atsign.org)');
   parser.addFlag('verbose', abbr: 'v', help: 'More logging');
+  parser.addFlag('never-sync', abbr: 'n', help: 'Completely disable sync');
 
   // Check the arguments
-  dynamic results;
+  dynamic parsedArgs;
   String atsignFile;
 
   String fromAtsign = 'unknown';
@@ -55,17 +60,17 @@ Future<void> atTalk(List<String> args) async {
 
   try {
     // Arg check
-    results = parser.parse(args);
+    parsedArgs = parser.parse(args);
     // Find atSign key file
-    fromAtsign = results['atsign'];
-    toAtsign = results['toatsign'];
+    fromAtsign = parsedArgs['atsign'];
+    toAtsign = parsedArgs['toatsign'];
 
-    if (results['root-domain'] != null) {
-      rootDomain = results['root-domain'];
+    if (parsedArgs['root-domain'] != null) {
+      rootDomain = parsedArgs['root-domain'];
     }
 
-    if (results['key-file'] != null) {
-      atsignFile = results['key-file'];
+    if (parsedArgs['key-file'] != null) {
+      atsignFile = parsedArgs['key-file'];
     } else {
       atsignFile = '${fromAtsign}_key.atKeys';
       atsignFile = '$homeDirectory/.atsign/keys/$atsignFile';
@@ -80,9 +85,15 @@ Future<void> atTalk(List<String> args) async {
     exit(1);
   }
 
+  AtServiceFactory? atServiceFactory;
+  if (parsedArgs['never-sync']) {
+    stdout.writeln(chalk.brightBlue('Creating ServiceFactoryWithNoOpSyncService'));
+    atServiceFactory = ServiceFactoryWithNoOpSyncService();
+  }
+
 // Now on to the atPlatform startup
   AtSignLogger.root_level = 'SHOUT';
-  if (results['verbose']) {
+  if (parsedArgs['verbose']) {
     _logger.logger.level = Level.INFO;
 
     AtSignLogger.root_level = 'INFO';
@@ -100,7 +111,7 @@ Future<void> atTalk(List<String> args) async {
     ..atKeysFilePath = atsignFile
     ..useAtChops = true;
 
-  AtOnboardingService onboardingService = AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig);
+  AtOnboardingService onboardingService = AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig, atServiceFactory: atServiceFactory);
   bool onboarded = false;
   Duration retryDuration = Duration(seconds: 3);
   while (!onboarded) {
@@ -153,6 +164,11 @@ Future<void> atTalk(List<String> args) async {
       toAtsign = input.replaceFirst(RegExp('^/'), '');
       print('now talking to: $toAtsign');
       input = '';
+    }
+
+    if (generateCommandRegEx.hasMatch(input)) {
+      int length = int.parse(input.split(' ')[1]);
+      input = String.fromCharCodes(Iterable.generate(length, (index) => digits.codeUnitAt(index % 10)));
     }
 
     var metaData = Metadata()
