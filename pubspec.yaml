@@ -13,9 +13,3 @@ dependencies:
 dev_dependencies:
   lints: ^1.0.0
   test: ^1.16.0
-
-dependency_overrides:
-  at_onboarding_cli:
-    path: ../at_libraries/packages/at_onboarding_cli
-  at_client:
-    path: ../at_client_sdk/packages/at_client
