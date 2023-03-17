@@ -46,8 +46,8 @@ Future<void> atTalk(List<String> args) async {
   parser.addOption('toatsign', abbr: 't', mandatory: true, help: 'Talk to this atSign');
   parser.addOption('root-domain', abbr: 'd', mandatory: false, help: 'Root Domain (defaults to root.atsign.org)');
   parser.addOption('namespace', abbr: 'n', mandatory: false, help: 'Namespace (defaults to ai6bh)');
-  parser.addFlag('verbose', abbr: 'v', help: 'More logging');
-  parser.addFlag('never-sync', help: 'Completely disable sync');
+  parser.addFlag('verbose', abbr: 'v', help: 'More logging', negatable: false);
+  parser.addFlag('never-sync', help: 'Completely disable sync', negatable: false);
 
   // Check the arguments
   dynamic parsedArgs;
