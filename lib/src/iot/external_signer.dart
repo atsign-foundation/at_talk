@@ -42,9 +42,10 @@ class ExternalSigner {
   }
 
   String? sign(String dataHash) {
+    var channelNumber;
     try {
       // Step 1. Open a logical channel. This should return a logical port  number [01|02|03] followed by [9000]. 9000 is success code.
-      var channelNumber = _openLogicalChannel();
+      channelNumber = _openLogicalChannel();
       // Step 2. Select IOTsafe by application id
       _selectIOTSafeApplication(channelNumber!);
 
@@ -52,14 +53,22 @@ class ExternalSigner {
       _computeSignatureInit(channelNumber);
 
       // Step 4. Compute signature update
-      _computeSignatureUpdate(channelNumber, dataHash);
+      _computeSignatureUpdate(channelNumber, dataHash.toUpperCase());
 
       // Strp 5. Retrieve computed signature
       var signature = _retrieveSignature(channelNumber);
-      return signature;
+      return signature.toLowerCase();
     } on Exception catch (e, trace) {
       print('exception during signing ${e.toString()}');
       print(trace);
+    } finally {
+      if (channelNumber != null &&
+          channelNumber.startsWith(RegExp(r'01|02|03'))) {
+        print('closing channel $channelNumber');
+        _closeChannel(_serialPort, channelNumber);
+      }
+      _serialPort.setVMIN(0);
+      _serialPort.dispose();
     }
     return null;
   }
