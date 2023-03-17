@@ -41,12 +41,13 @@ Future<void> atTalk(List<String> args) async {
   var parser = ArgParser();
 // Args
   parser.addOption('key-file',
-   abbr: 'k', mandatory: false, help: 'Your @sign\'s atKeys file if not in ~/.atsign/keys/');
+   abbr: 'k', mandatory: false, help: 'Your atSign\'s atKeys file if not in ~/.atsign/keys/');
   parser.addOption('atsign', abbr: 'a', mandatory: true, help: 'Your atSign');
-  parser.addOption('toatsign', abbr: 't', mandatory: true, help: 'Talk to this @sign');
+  parser.addOption('toatsign', abbr: 't', mandatory: true, help: 'Talk to this atSign');
   parser.addOption('root-domain', abbr: 'd', mandatory: false, help: 'Root Domain (defaults to root.atsign.org)');
+  parser.addOption('namespace', abbr: 'n', mandatory: false, help: 'Namespace (defaults to ai6bh)');
   parser.addFlag('verbose', abbr: 'v', help: 'More logging');
-  parser.addFlag('never-sync', abbr: 'n', help: 'Completely disable sync');
+  parser.addFlag('never-sync', help: 'Completely disable sync');
 
   // Check the arguments
   dynamic parsedArgs;
@@ -57,6 +58,7 @@ Future<void> atTalk(List<String> args) async {
   String? homeDirectory = getHomeDirectory();
   String nameSpace = 'ai6bh';
   String rootDomain = 'root.atsign.org';
+  bool hasTerminal = true;
 
   try {
     // Arg check
@@ -67,6 +69,10 @@ Future<void> atTalk(List<String> args) async {
 
     if (parsedArgs['root-domain'] != null) {
       rootDomain = parsedArgs['root-domain'];
+    }
+
+    if (parsedArgs['namespace'] != null) {
+      nameSpace = parsedArgs['namespace'];
     }
 
     if (parsedArgs['key-file'] != null) {
@@ -111,6 +117,20 @@ Future<void> atTalk(List<String> args) async {
     ..atKeysFilePath = atsignFile
     ..useAtChops = true;
 
+  var metaData = Metadata()
+    ..isPublic = false
+    ..isEncrypted = true
+    ..namespaceAware = true
+    ..ttr = -1
+    ..ttl = 10000;
+
+  var key = AtKey()
+    ..key = 'attalk'
+    ..sharedBy = fromAtsign
+    ..sharedWith = toAtsign
+    ..namespace = nameSpace
+    ..metadata = metaData;
+
   AtOnboardingService onboardingService = AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig, atServiceFactory: atServiceFactory);
   bool onboarded = false;
   Duration retryDuration = Duration(seconds: 3);
@@ -131,7 +151,8 @@ Future<void> atTalk(List<String> args) async {
   // Current atClient is the one which the onboardingService just authenticated
   AtClient atClient = AtClientManager.getInstance().atClient;
 
-  atClient.notificationService.subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true).listen(((notification) async {
+  atClient.notificationService.subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true).listen(
+      ((notification) async {
     String keyAtsign = notification.key;
     keyAtsign = keyAtsign.replaceAll(notification.to + ':', '');
     keyAtsign = keyAtsign.replaceAll('.' + nameSpace + notification.from, '');
@@ -150,6 +171,7 @@ Future<void> atTalk(List<String> args) async {
       onDone: () => _logger.info('Notification listener stopped'));
 
   String input = "";
+  String buffer = "";
   pipePrint('$fromAtsign: ');
 
   var lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
@@ -186,15 +208,34 @@ Future<void> atTalk(List<String> args) async {
       ..metadata = metaData;
 
     if (!(input == "")) {
-      var success = sendNotification(atClient.notificationService, key, input, _logger);
-      if (!await success) {
-        print(chalk.brightRed.bold('\r\x1b[KError Sending: ') +
-            '"' +
-            input +
-            '"' +
-            ' to $toAtsign - unable to reach the Internet !');
-        pipePrint('$fromAtsign: ');
+      if (!(stdin.hasTerminal)) {
+        hasTerminal = false;
+        buffer = buffer + '\n\r' + input;
+      } else {
+        hasTerminal = true;
+        var success = sendNotification(atClient.notificationService, key, input, _logger);
+        if (!await success) {
+          print(chalk.brightRed.bold('\r\x1b[KError Sending: ') +
+              '"' +
+              input +
+              '"' +
+              ' to $toAtsign - unable to reach the Internet !');
+          pipePrint('$fromAtsign: ');
+        }
       }
+    }
+  }
+
+// Send file contents if stdin has no terminal
+  if (!(hasTerminal)) {
+    var success = sendNotification(atClient.notificationService, key, chalk.brightBlue('Sending a file') + chalk.white( buffer), _logger);
+    if (!await success) {
+      print(chalk.brightRed.bold('\r\x1b[KError Sending: ') +
+          '"' +
+          input +
+          '"' +
+          ' to $toAtsign - unable to reach the Internet !');
+      pipePrint('$fromAtsign: ');
     }
   }
 
@@ -217,7 +258,7 @@ Future<bool> sendNotification(
         success = true;
         _logger.info('SENT:' + notification.toString());
         // pendingSend--;
-      }, waitForFinalDeliveryStatus: false);
+      }, waitForFinalDeliveryStatus: false, checkForFinalDeliveryStatus: false);
     } catch (e) {
       _logger.severe(e.toString());
     }
