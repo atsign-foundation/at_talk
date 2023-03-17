@@ -93,10 +93,10 @@ packages:
     dependency: "direct main"
     description:
       name: at_onboarding_cli
-      sha256: "8e4a6b1966c1399a4df970240692dcdc3514d37d9729b5344d19962d4f0e5a32"
+      sha256: e1c60a2f0cfc0ab2e1dd418d774e8cca05365b8c6708795f20efb2dcb0c553b9
       url: "https://pub.dev"
     source: hosted
-    version: "1.2.3"
+    version: "1.2.4"
   at_persistence_secondary_server:
     dependency: transitive
     description:
