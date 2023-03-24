@@ -22,12 +22,17 @@ Future<void> main(List<String> args) async {
     ..publicKeyId='303037'
   ..cramSecret=args[0]
   ..skipSync=true;
+  AtSignLogger.root_level = 'INFO';
   var logger = AtSignLogger('OnboardSecureElement');
-  logger.level = 'INFO';
+
 
   AtOnboardingService onboardingService = AtOnboardingServiceImpl(atSign, atOnboardingConfig);
   // create empty keys in atchops. Encryption key pair will be set later on after generation
   onboardingService.atChops = AtChopsSecureElement(AtChopsKeys.create(null, null));
+  logger.info('calling onboard');
   await onboardingService.onboard();
+  logger.info('onboard done');
+  logger.info('calling auth');
   await onboardingService.authenticate();
+  logger.info('auth done');
 }
