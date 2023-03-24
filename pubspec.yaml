@@ -22,10 +22,11 @@ dependency_overrides:
       path: packages/at_chops
       ref: integrate_pkam_secure_element
   at_onboarding_cli:
+#    path: ../at_libraries/packages/at_onboarding_cli
     git:
       url: https://github.com/atsign-foundation/at_libraries.git
       path: packages/at_onboarding_cli
-      ref: pi_test
+      ref: integrate_pkam_secure_element
   at_lookup:
     git:
       url: https://github.com/atsign-foundation/at_libraries.git
