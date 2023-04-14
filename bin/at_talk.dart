@@ -17,6 +17,7 @@ import 'package:at_onboarding_cli/at_onboarding_cli.dart';
 // Local Packages
 import 'package:at_talk/home_directory.dart';
 import 'package:at_talk/check_file_exists.dart';
+import 'package:version/version.dart';
 
 const String digits = '0123456789';
 final RegExp generateCommandRegEx = RegExp(r'^/gen \d+$');
@@ -115,7 +116,8 @@ Future<void> atTalk(List<String> args) async {
     ..rootDomain = rootDomain
     ..fetchOfflineNotifications = true
     ..atKeysFilePath = atsignFile
-    ..useAtChops = true;
+    ..useAtChops = false
+    ..atProtocolEmitted = Version(2, 0, 0);
 
   var metaData = Metadata()
     ..isPublic = false
@@ -244,26 +246,26 @@ Future<void> atTalk(List<String> args) async {
 
 Future<bool> sendNotification(
     NotificationService notificationService, AtKey key, String input, AtSignLogger _logger) async {
-  int retry = 0;
   bool success = false;
-  while (retry < 3) {
+
+  // back off retries (max 3)
+  for (int retry = 0; retry < 3; retry++) {
     try {
-      await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
-        _logger.info('SUCCESS:' + notification.toString());
-      }, onError: (notification) {
+      NotificationResult result = await notificationService.notify(
+          NotificationParams.forUpdate(key, value: input),
+          waitForFinalDeliveryStatus: false,
+          checkForFinalDeliveryStatus: false);
+      if (result.atClientException != null) {
+        _logger.warning(result.atClientException);
         retry++;
-        _logger.info('ERROR (retry $retry of 3): "$input"' + notification.toString());
-      }, onSentToSecondary: (notification) {
-        retry = 4;
+        await Future.delayed(Duration(milliseconds: (500 * (retry))));
+      } else {
         success = true;
-        _logger.info('SENT:' + notification.toString());
-        // pendingSend--;
-      }, waitForFinalDeliveryStatus: false, checkForFinalDeliveryStatus: false);
+        break;
+      }
     } catch (e) {
-      _logger.severe(e.toString());
+      _logger.warning(e);
     }
-    // back off retries (max 3)
-    await Future.delayed(Duration(milliseconds: (500 * (retry))));
   }
   return (success);
 }

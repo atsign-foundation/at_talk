@@ -6,9 +6,10 @@ environment:
   sdk: '>=2.17.3 <3.0.0'
 
 dependencies:
-  at_client: ^3.0.56
-  at_onboarding_cli: ^1.2.4
-  chalkdart: ^2.0.8
+  at_client: ^3.0.58
+  at_onboarding_cli: ^1.2.5
+  chalkdart: ^2.0.9
+  version: ^3.0.2
 
 dev_dependencies:
   lints: ^1.0.0
