@@ -5,6 +5,7 @@ import 'dart:async';
 // external packages
 import 'package:args/args.dart';
 import 'package:at_talk/pipe_print.dart';
+import 'package:at_talk/service_factories.dart';
 import 'package:logging/src/level.dart';
 import 'package:chalkdart/chalk.dart';
 
@@ -16,6 +17,10 @@ import 'package:at_onboarding_cli/at_onboarding_cli.dart';
 // Local Packages
 import 'package:at_talk/home_directory.dart';
 import 'package:at_talk/check_file_exists.dart';
+import 'package:version/version.dart';
+
+const String digits = '0123456789';
+final RegExp generateCommandRegEx = RegExp(r'^/gen \d+$');
 
 void main(List<String> args) async {
   //starting secondary in a zone
@@ -42,10 +47,11 @@ Future<void> atTalk(List<String> args) async {
   parser.addOption('toatsign', abbr: 't', mandatory: true, help: 'Talk to this atSign');
   parser.addOption('root-domain', abbr: 'd', mandatory: false, help: 'Root Domain (defaults to root.atsign.org)');
   parser.addOption('namespace', abbr: 'n', mandatory: false, help: 'Namespace (defaults to ai6bh)');
-  parser.addFlag('verbose', abbr: 'v', help: 'More logging');
+  parser.addFlag('verbose', abbr: 'v', help: 'More logging', negatable: false);
+  parser.addFlag('never-sync', help: 'Completely disable sync', negatable: false);
 
   // Check the arguments
-  dynamic results;
+  dynamic parsedArgs;
   String atsignFile;
 
   String fromAtsign = 'unknown';
@@ -57,21 +63,21 @@ Future<void> atTalk(List<String> args) async {
 
   try {
     // Arg check
-    results = parser.parse(args);
+    parsedArgs = parser.parse(args);
     // Find atSign key file
-    fromAtsign = results['atsign'];
-    toAtsign = results['toatsign'];
+    fromAtsign = parsedArgs['atsign'];
+    toAtsign = parsedArgs['toatsign'];
 
-    if (results['root-domain'] != null) {
-      rootDomain = results['root-domain'];
+    if (parsedArgs['root-domain'] != null) {
+      rootDomain = parsedArgs['root-domain'];
     }
 
-    if (results['namespace'] != null) {
-      nameSpace = results['namespace'];
+    if (parsedArgs['namespace'] != null) {
+      nameSpace = parsedArgs['namespace'];
     }
 
-    if (results['key-file'] != null) {
-      atsignFile = results['key-file'];
+    if (parsedArgs['key-file'] != null) {
+      atsignFile = parsedArgs['key-file'];
     } else {
       atsignFile = '${fromAtsign}_key.atKeys';
       atsignFile = '$homeDirectory/.atsign/keys/$atsignFile';
@@ -86,9 +92,15 @@ Future<void> atTalk(List<String> args) async {
     exit(1);
   }
 
+  AtServiceFactory? atServiceFactory;
+  if (parsedArgs['never-sync']) {
+    stdout.writeln(chalk.brightBlue('Creating ServiceFactoryWithNoOpSyncService'));
+    atServiceFactory = ServiceFactoryWithNoOpSyncService();
+  }
+
 // Now on to the atPlatform startup
   AtSignLogger.root_level = 'SHOUT';
-  if (results['verbose']) {
+  if (parsedArgs['verbose']) {
     _logger.logger.level = Level.INFO;
 
     AtSignLogger.root_level = 'INFO';
@@ -104,7 +116,8 @@ Future<void> atTalk(List<String> args) async {
     ..rootDomain = rootDomain
     ..fetchOfflineNotifications = true
     ..atKeysFilePath = atsignFile
-    ..useAtChops = true;
+    ..useAtChops = false
+    ..atProtocolEmitted = Version(2, 0, 0);
 
   var metaData = Metadata()
     ..isPublic = false
@@ -120,7 +133,7 @@ Future<void> atTalk(List<String> args) async {
     ..namespace = nameSpace
     ..metadata = metaData;
 
-  AtOnboardingService onboardingService = AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig);
+  AtOnboardingService onboardingService = AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig, atServiceFactory: atServiceFactory);
   bool onboarded = false;
   Duration retryDuration = Duration(seconds: 3);
   while (!onboarded) {
@@ -177,6 +190,25 @@ Future<void> atTalk(List<String> args) async {
       input = '';
     }
 
+    if (generateCommandRegEx.hasMatch(input)) {
+      int length = int.parse(input.split(' ')[1]);
+      input = String.fromCharCodes(Iterable.generate(length, (index) => digits.codeUnitAt(index % 10)));
+    }
+
+    var metaData = Metadata()
+      ..isPublic = false
+      ..isEncrypted = true
+      ..namespaceAware = true
+      ..ttr = -1
+      ..ttl = 10000;
+
+    var key = AtKey()
+      ..key = 'attalk'
+      ..sharedBy = fromAtsign
+      ..sharedWith = toAtsign
+      ..namespace = nameSpace
+      ..metadata = metaData;
+
     if (!(input == "")) {
       if (!(stdin.hasTerminal)) {
         hasTerminal = false;
@@ -214,26 +246,26 @@ Future<void> atTalk(List<String> args) async {
 
 Future<bool> sendNotification(
     NotificationService notificationService, AtKey key, String input, AtSignLogger _logger) async {
-  int retry = 0;
   bool success = false;
-  while (retry < 3) {
+
+  // back off retries (max 3)
+  for (int retry = 0; retry < 3; retry++) {
     try {
-      await notificationService.notify(NotificationParams.forUpdate(key, value: input), onSuccess: (notification) {
-        _logger.info('SUCCESS:' + notification.toString());
-      }, onError: (notification) {
+      NotificationResult result = await notificationService.notify(
+          NotificationParams.forUpdate(key, value: input),
+          waitForFinalDeliveryStatus: false,
+          checkForFinalDeliveryStatus: false);
+      if (result.atClientException != null) {
+        _logger.warning(result.atClientException);
         retry++;
-        _logger.info('ERROR (retry $retry of 3): "$input"' + notification.toString());
-      }, onSentToSecondary: (notification) {
-        retry = 4;
+        await Future.delayed(Duration(milliseconds: (500 * (retry))));
+      } else {
         success = true;
-        _logger.info('SENT:' + notification.toString());
-        // pendingSend--;
-      }, waitForFinalDeliveryStatus: false, checkForFinalDeliveryStatus: false);
+        break;
+      }
     } catch (e) {
-      _logger.severe(e.toString());
+      _logger.warning(e);
     }
-    // back off retries (max 3)
-    await Future.delayed(Duration(milliseconds: (500 * (retry))));
   }
   return (success);
 }
