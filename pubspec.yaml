@@ -6,7 +6,6 @@ environment:
   sdk: '>=2.17.3 <3.0.0'
 
 dependencies:
-  at_client: ^3.0.58
   at_onboarding_cli: ^1.2.5
   chalkdart: ^2.0.9
   version: ^3.0.2
@@ -14,3 +13,10 @@ dependencies:
 dev_dependencies:
   lints: ^1.0.0
   test: ^1.16.0
+
+dependency_overrides:
+  at_client: 
+   git:
+     url: https://github.com/atsign-foundation/at_client_sdk.git
+     path: packages/at_client
+     ref: gkc-fewer-more-configurable-network-checks
