@@ -42,13 +42,21 @@ Future<void> atTalk(List<String> args) async {
   var parser = ArgParser();
 // Args
   parser.addOption('key-file',
-   abbr: 'k', mandatory: false, help: 'Your atSign\'s atKeys file if not in ~/.atsign/keys/');
+      abbr: 'k',
+      mandatory: false,
+      help: 'Your atSign\'s atKeys file if not in ~/.atsign/keys/');
   parser.addOption('atsign', abbr: 'a', mandatory: true, help: 'Your atSign');
-  parser.addOption('toatsign', abbr: 't', mandatory: true, help: 'Talk to this atSign');
-  parser.addOption('root-domain', abbr: 'd', mandatory: false, help: 'Root Domain (defaults to root.atsign.org)');
-  parser.addOption('namespace', abbr: 'n', mandatory: false, help: 'Namespace (defaults to ai6bh)');
+  parser.addOption('toatsign',
+      abbr: 't', mandatory: true, help: 'Talk to this atSign');
+  parser.addOption('root-domain',
+      abbr: 'd',
+      mandatory: false,
+      help: 'Root Domain (defaults to root.atsign.org)');
+  parser.addOption('namespace',
+      abbr: 'n', mandatory: false, help: 'Namespace (defaults to ai6bh)');
   parser.addFlag('verbose', abbr: 'v', help: 'More logging', negatable: false);
-  parser.addFlag('never-sync', help: 'Completely disable sync', negatable: false);
+  parser.addFlag('never-sync',
+      help: 'Completely disable sync', negatable: false);
 
   // Check the arguments
   dynamic parsedArgs;
@@ -94,7 +102,8 @@ Future<void> atTalk(List<String> args) async {
 
   AtServiceFactory? atServiceFactory;
   if (parsedArgs['never-sync']) {
-    stdout.writeln(chalk.brightBlue('Creating ServiceFactoryWithNoOpSyncService'));
+    stdout.writeln(
+        chalk.brightBlue('Creating ServiceFactoryWithNoOpSyncService'));
     atServiceFactory = ServiceFactoryWithNoOpSyncService();
   }
 
@@ -116,15 +125,12 @@ Future<void> atTalk(List<String> args) async {
     ..rootDomain = rootDomain
     ..fetchOfflineNotifications = true
     ..atKeysFilePath = atsignFile
-    ..useAtChops = false
     ..atProtocolEmitted = Version(2, 0, 0);
 
   var metaData = Metadata()
     ..isPublic = false
     ..isEncrypted = true
-    ..namespaceAware = true
-    ..ttr = -1
-    ..ttl = 10000;
+    ..namespaceAware = true;
 
   var key = AtKey()
     ..key = 'attalk'
@@ -133,16 +139,21 @@ Future<void> atTalk(List<String> args) async {
     ..namespace = nameSpace
     ..metadata = metaData;
 
-  AtOnboardingService onboardingService = AtOnboardingServiceImpl(fromAtsign, atOnboardingConfig, atServiceFactory: atServiceFactory);
+  AtOnboardingService onboardingService = AtOnboardingServiceImpl(
+      fromAtsign, atOnboardingConfig,
+      atServiceFactory: atServiceFactory);
   bool onboarded = false;
   Duration retryDuration = Duration(seconds: 3);
   while (!onboarded) {
     try {
       stdout.write(chalk.brightBlue('\r\x1b[KConnecting ... '));
-      await Future.delayed(Duration(milliseconds: 1000)); // Pause just long enough for the retry to be visible
+      await Future.delayed(Duration(
+          milliseconds:
+              1000)); // Pause just long enough for the retry to be visible
       onboarded = await onboardingService.authenticate();
     } catch (exception) {
-      stdout.write(chalk.brightRed('$exception. Will retry in ${retryDuration.inSeconds} seconds'));
+      stdout.write(chalk.brightRed(
+          '$exception. Will retry in ${retryDuration.inSeconds} seconds'));
     }
     if (!onboarded) {
       await Future.delayed(retryDuration);
@@ -153,24 +164,29 @@ Future<void> atTalk(List<String> args) async {
   // Current atClient is the one which the onboardingService just authenticated
   AtClient atClient = AtClientManager.getInstance().atClient;
 
-  atClient.notificationService.subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true).listen(
-      ((notification) async {
+  atClient.notificationService
+      .subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true)
+      .listen(((notification) async {
     String keyAtsign = notification.key;
     keyAtsign = keyAtsign.replaceAll(notification.to + ':', '');
     keyAtsign = keyAtsign.replaceAll('.' + nameSpace + notification.from, '');
     if (keyAtsign == 'attalk') {
-      _logger.info('atTalk update received from ' + notification.from + ' notification id : ' + notification.id);
+      _logger.info('atTalk update received from ' +
+          notification.from +
+          ' notification id : ' +
+          notification.id);
       var talk = notification.value!;
       // Terminal Control
       // '\r\x1b[K' is used to set the cursor back to the beginning of the line then deletes to the end of line
       //
-      print(chalk.brightGreen.bold('\r\x1b[K${notification.from}: ') + chalk.brightGreen(talk));
+      print(chalk.brightGreen.bold('\r\x1b[K${notification.from}: ') +
+          chalk.brightGreen(talk));
 
       pipePrint('$fromAtsign: ');
     }
   }),
-      onError: (e) => _logger.severe('Notification Failed:' + e.toString()),
-      onDone: () => _logger.info('Notification listener stopped'));
+          onError: (e) => _logger.severe('Notification Failed:' + e.toString()),
+          onDone: () => _logger.info('Notification listener stopped'));
 
   String input = "";
   String buffer = "";
@@ -192,15 +208,15 @@ Future<void> atTalk(List<String> args) async {
 
     if (generateCommandRegEx.hasMatch(input)) {
       int length = int.parse(input.split(' ')[1]);
-      input = String.fromCharCodes(Iterable.generate(length, (index) => digits.codeUnitAt(index % 10)));
+      input = String.fromCharCodes(
+          Iterable.generate(length, (index) => digits.codeUnitAt(index % 10)));
     }
 
     var metaData = Metadata()
       ..isPublic = false
       ..isEncrypted = true
-      ..namespaceAware = true
-      ..ttr = -1
-      ..ttl = 10000;
+      ..namespaceAware = true;
+
 
     var key = AtKey()
       ..key = 'attalk'
@@ -215,7 +231,8 @@ Future<void> atTalk(List<String> args) async {
         buffer = buffer + '\n\r' + input;
       } else {
         hasTerminal = true;
-        var success = sendNotification(atClient.notificationService, key, input, _logger);
+        var success =
+            sendNotification(atClient.notificationService, key, input, _logger);
         if (!await success) {
           print(chalk.brightRed.bold('\r\x1b[KError Sending: ') +
               '"' +
@@ -230,7 +247,8 @@ Future<void> atTalk(List<String> args) async {
 
 // Send file contents if stdin has no terminal
   if (!(hasTerminal)) {
-    var success = sendNotification(atClient.notificationService, key, chalk.brightBlue('Sending a file') + chalk.white( buffer), _logger);
+    var success = sendNotification(atClient.notificationService, key,
+        chalk.brightBlue('Sending a file') + chalk.white(buffer), _logger);
     if (!await success) {
       print(chalk.brightRed.bold('\r\x1b[KError Sending: ') +
           '"' +
@@ -244,8 +262,8 @@ Future<void> atTalk(List<String> args) async {
   exit(0);
 }
 
-Future<bool> sendNotification(
-    NotificationService notificationService, AtKey key, String input, AtSignLogger _logger) async {
+Future<bool> sendNotification(NotificationService notificationService,
+    AtKey key, String input, AtSignLogger _logger) async {
   bool success = false;
 
   // back off retries (max 3)
