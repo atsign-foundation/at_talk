@@ -26,7 +26,7 @@ void main(List<String> args) async {
   //starting secondary in a zone
   var logger = AtSignLogger('atTalk sender ');
   logger.logger.level = Level.SHOUT;
-  runZonedGuarded(() async {
+  await runZonedGuarded(() async {
     await atTalk(args);
   }, (error, stackTrace) {
     logger.severe('Uncaught error: $error');
@@ -35,9 +35,9 @@ void main(List<String> args) async {
 }
 
 Future<void> atTalk(List<String> args) async {
-  final AtSignLogger _logger = AtSignLogger(' atTalk ');
-  _logger.hierarchicalLoggingEnabled = true;
-  _logger.logger.level = Level.SHOUT;
+  final AtSignLogger logger = AtSignLogger(' atTalk ');
+  logger.hierarchicalLoggingEnabled = true;
+  logger.logger.level = Level.SHOUT;
 
   var parser = ArgParser();
 // Args
@@ -110,7 +110,7 @@ Future<void> atTalk(List<String> args) async {
 // Now on to the atPlatform startup
   AtSignLogger.root_level = 'SHOUT';
   if (parsedArgs['verbose']) {
-    _logger.logger.level = Level.INFO;
+    logger.logger.level = Level.INFO;
 
     AtSignLogger.root_level = 'INFO';
   }
@@ -149,7 +149,7 @@ Future<void> atTalk(List<String> args) async {
       stdout.write(chalk.brightBlue('\r\x1b[KConnecting ... '));
       await Future.delayed(Duration(
           milliseconds:
-              1000)); // Pause just long enough for the retry to be visible
+          1000)); // Pause just long enough for the retry to be visible
       onboarded = await onboardingService.authenticate();
     } catch (exception) {
       stdout.write(chalk.brightRed(
@@ -168,13 +168,10 @@ Future<void> atTalk(List<String> args) async {
       .subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true)
       .listen(((notification) async {
     String keyAtsign = notification.key;
-    keyAtsign = keyAtsign.replaceAll(notification.to + ':', '');
-    keyAtsign = keyAtsign.replaceAll('.' + nameSpace + notification.from, '');
+    keyAtsign = keyAtsign.replaceAll('${notification.to}:', '');
+    keyAtsign = keyAtsign.replaceAll('.$nameSpace${notification.from}', '');
     if (keyAtsign == 'attalk') {
-      _logger.info('atTalk update received from ' +
-          notification.from +
-          ' notification id : ' +
-          notification.id);
+      logger.info('atTalk update received from ${notification.from} notification id : ${notification.id}');
       var talk = notification.value!;
       // Terminal Control
       // '\r\x1b[K' is used to set the cursor back to the beginning of the line then deletes to the end of line
@@ -185,8 +182,8 @@ Future<void> atTalk(List<String> args) async {
       pipePrint('$fromAtsign: ');
     }
   }),
-          onError: (e) => _logger.severe('Notification Failed:' + e.toString()),
-          onDone: () => _logger.info('Notification listener stopped'));
+      onError: (e) => logger.severe('Notification Failed:$e'),
+      onDone: () => logger.info('Notification listener stopped'));
 
   String input = "";
   String buffer = "";
@@ -228,17 +225,13 @@ Future<void> atTalk(List<String> args) async {
     if (!(input == "")) {
       if (!(stdin.hasTerminal)) {
         hasTerminal = false;
-        buffer = buffer + '\n\r' + input;
+        buffer = '$buffer\n\r$input';
       } else {
         hasTerminal = true;
         var success =
-            sendNotification(atClient.notificationService, key, input, _logger);
+        sendNotification(atClient.notificationService, key, input, logger);
         if (!await success) {
-          print(chalk.brightRed.bold('\r\x1b[KError Sending: ') +
-              '"' +
-              input +
-              '"' +
-              ' to $toAtsign - unable to reach the Internet !');
+          print('${chalk.brightRed.bold('\r\x1b[KError Sending: ')}"$input" to $toAtsign - unable to reach the Internet !');
           pipePrint('$fromAtsign: ');
         }
       }
@@ -248,13 +241,9 @@ Future<void> atTalk(List<String> args) async {
 // Send file contents if stdin has no terminal
   if (!(hasTerminal)) {
     var success = sendNotification(atClient.notificationService, key,
-        chalk.brightBlue('Sending a file') + chalk.white(buffer), _logger);
+        chalk.brightBlue('Sending a file') + chalk.white(buffer), logger);
     if (!await success) {
-      print(chalk.brightRed.bold('\r\x1b[KError Sending: ') +
-          '"' +
-          input +
-          '"' +
-          ' to $toAtsign - unable to reach the Internet !');
+      print('${chalk.brightRed.bold('\r\x1b[KError Sending: ')}"$input" to $toAtsign - unable to reach the Internet !');
       pipePrint('$fromAtsign: ');
     }
   }
@@ -263,7 +252,7 @@ Future<void> atTalk(List<String> args) async {
 }
 
 Future<bool> sendNotification(NotificationService notificationService,
-    AtKey key, String input, AtSignLogger _logger) async {
+    AtKey key, String input, AtSignLogger logger) async {
   bool success = false;
 
   // back off retries (max 3)
@@ -274,7 +263,7 @@ Future<bool> sendNotification(NotificationService notificationService,
           waitForFinalDeliveryStatus: false,
           checkForFinalDeliveryStatus: false);
       if (result.atClientException != null) {
-        _logger.warning(result.atClientException);
+        logger.warning(result.atClientException);
         retry++;
         await Future.delayed(Duration(milliseconds: (500 * (retry))));
       } else {
@@ -282,7 +271,7 @@ Future<bool> sendNotification(NotificationService notificationService,
         break;
       }
     } catch (e) {
-      _logger.warning(e);
+      logger.warning(e);
     }
   }
   return (success);
