@@ -12,6 +12,7 @@ import 'dart:convert';
 class ChatSession {
   final String atSign;
   final List<String> messages = [];
+  int scrollOffset = 0; // For scrolling
   ChatSession(this.atSign);
 }
 
@@ -26,6 +27,9 @@ class TuiChatApp {
   int windowSize = 1;
   List<String> get sessionList => sessions.keys.toList();
 
+  String inputBuffer = '';
+  bool redrawRequested = false;
+
   TuiChatApp(this.myAtSign);
 
   void addSession(String atSign) {
@@ -39,12 +43,16 @@ class TuiChatApp {
     windowOffset = sessionList.indexOf(atSign);
   }
 
+  void requestRedraw() {
+    redrawRequested = true;
+  }
+
   void addMessage(String atSign, String message, {bool incoming = false}) {
     addSession(atSign);
     final prefix = incoming ? chalk.green('$atSign: ') : chalk.blue('me: ');
     sessions[atSign]!.messages.add(prefix + message);
-    if (activeSession != atSign) {
-      // Optionally show notification for new message in inactive session
+    if (activeSession == atSign) {
+      requestRedraw();
     }
   }
 
@@ -60,51 +68,115 @@ class TuiChatApp {
     activeSession = sessionList[windowOffset];
   }
 
-  void draw() {
-    stdout.write('\x1b[2J\x1b[H'); // Clear screen
-    stdout.writeln(chalk.bold('atTalk TUI - @${myAtSign}'));
-    stdout.writeln('Sessions: ' + sessionList.asMap().entries.map((e) => e.key == windowOffset ? chalk.yellow('[${e.value}]') : e.value).join(' '));
-    stdout.writeln('---');
-    // Show all windows (panes)
-    for (int i = 0; i < sessionList.length; i++) {
-      var s = sessionList[i];
-      stdout.writeln((i == windowOffset ? chalk.yellow('== $s ==') : '   $s'));
-      for (var msg in sessions[s]!.messages.take(10)) {
-        stdout.writeln(msg);
-      }
-      stdout.writeln('---');
+  void scrollUp() {
+    if (activeSession == null) return;
+    final session = sessions[activeSession!]!;
+    if (session.scrollOffset < session.messages.length - 1) {
+      session.scrollOffset++;
     }
-    stdout.writeln('Commands: /switch @other, /new @other, /next, /prev, /exit');
-    stdout.write('> ');
+  }
+
+  void scrollDown() {
+    if (activeSession == null) return;
+    final session = sessions[activeSession!]!;
+    if (session.scrollOffset > 0) {
+      session.scrollOffset--;
+    }
+  }
+
+  void draw() {
+    final termWidth = stdout.hasTerminal ? stdout.terminalColumns : 80;
+    final termHeight = stdout.hasTerminal ? stdout.terminalLines : 24;
+    final sessionWidth = 20;
+    final chatWidth = termWidth - sessionWidth - 2;
+    final chatHeight = termHeight - 5; // header + input + borders
+    stdout.write('\x1b[2J\x1b[H'); // Clear screen
+    // Header
+    stdout.writeln(chalk.bold('atTalk TUI - @${myAtSign}').padRight(termWidth));
+    stdout.writeln('─' * termWidth);
+    // Session list (left)
+    for (int i = 0; i < chatHeight; i++) {
+      String sessionLine = '';
+      if (i < sessionList.length) {
+        var s = sessionList[i];
+        var marker = (i == windowOffset) ? chalk.yellow('>') : ' ';
+        sessionLine = marker + ' ' + s.padRight(sessionWidth - 2);
+      } else {
+        sessionLine = ' '.padRight(sessionWidth);
+      }
+      stdout.write(sessionLine);
+      stdout.write(chalk.yellow('│'));
+      // Chat window (center)
+      if (activeSession != null) {
+        var s = activeSession!;
+        var session = sessions[s]!;
+        int maxLines = chatHeight;
+        int start = (session.messages.length - maxLines - session.scrollOffset).clamp(0, session.messages.length);
+        int end = (session.messages.length - session.scrollOffset).clamp(0, session.messages.length);
+        int msgIdx = i + start;
+        if (msgIdx < end) {
+          var msg = session.messages[msgIdx];
+          stdout.write(msg.padRight(chatWidth));
+        } else {
+          stdout.write(' '.padRight(chatWidth));
+        }
+      } else {
+        stdout.write(' '.padRight(chatWidth));
+      }
+      stdout.writeln();
+    }
+    stdout.writeln('─' * termWidth);
+    // Draw input at the last line
+    int inputLine = termHeight;
+    stdout.write('\x1b[${inputLine};1H');
+    stdout.write('> ' + inputBuffer);
+    // Move cursor to end of input
+    stdout.write('\x1b[${inputBuffer.length + 3}G');
   }
 
   Future<void> run() async {
+    stdin.echoMode = true;
+    stdin.lineMode = true;
     draw();
+    // Listen for incoming messages and redraw
+    Timer.periodic(Duration(milliseconds: 100), (_) {
+      if (redrawRequested) {
+        draw();
+        redrawRequested = false;
+      }
+    });
+    // Read lines from stdin
     var lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
     await for (final line in lines) {
-      if (line.startsWith('/switch ')) {
-        var atSign = line.substring(8).trim();
+      String input = line.trim();
+      inputBuffer = '';
+      if (input.startsWith('/switch ')) {
+        var atSign = input.substring(8).trim();
         switchSession(atSign);
-        windowOffset = sessionList.indexOf(atSign);
-      } else if (line.startsWith('/new ')) {
-        var atSign = line.substring(5).trim();
+      } else if (input.startsWith('/new ')) {
+        var atSign = input.substring(5).trim();
         addSession(atSign);
         switchSession(atSign);
-        windowOffset = sessionList.indexOf(atSign);
-      } else if (line == '/next') {
+      } else if (input == '/next') {
         nextWindow();
-      } else if (line == '/prev') {
+      } else if (input == '/prev') {
         prevWindow();
-      } else if (line == '/exit') {
+      } else if (input == '/up') {
+        scrollUp();
+      } else if (input == '/down') {
+        scrollDown();
+      } else if (input == '/exit') {
         break;
-      } else if (activeSession != null) {
-        addMessage(activeSession!, line);
+      } else if (activeSession != null && input.isNotEmpty) {
+        addMessage(activeSession!, input);
         if (onSend != null) {
-          onSend!(activeSession!, line);
+          onSend!(activeSession!, input);
         }
       }
       draw();
     }
+    stdin.echoMode = true;
+    stdin.lineMode = true;
   }
 }
 
