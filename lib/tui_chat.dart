@@ -181,6 +181,45 @@ class TuiChatApp {
     stdout.write('\x1b[${inputBuffer.length + 3}G');
   }
 
+  void showHelpPanel() {
+    final termWidth = stdout.hasTerminal ? stdout.terminalColumns : 80;
+    final termHeight = stdout.hasTerminal ? stdout.terminalLines : 24;
+    final helpLines = [
+      'atTalk TUI Help',
+      '',
+      'Shortcuts:',
+      '  /switch @other   Switch to chat with @other',
+      '  /new @other      Start new chat with @other',
+      '  /next            Next chat window',
+      '  /prev            Previous chat window',
+      '  /up              Scroll up in chat',
+      '  /down            Scroll down in chat',
+      '  /refresh         Redraw the screen',
+      '  /exit            Quit',
+      '',
+      'Press Enter to close this help panel.'
+    ];
+    int panelWidth = 48;
+    int panelHeight = helpLines.length + 2;
+    int left = ((termWidth - panelWidth) ~/ 2).clamp(0, termWidth-1);
+    int top = ((termHeight - panelHeight) ~/ 2).clamp(0, termHeight-1);
+    // Draw panel border
+    stdout.write('\x1b[2J\x1b[H');
+    for (int i = 0; i < top; i++) stdout.writeln();
+    stdout.write(' ' * left);
+    stdout.writeln(chalk.yellow('┌' + '─' * (panelWidth-2) + '┐'));
+    for (int i = 0; i < helpLines.length; i++) {
+      stdout.write(' ' * left);
+      String line = helpLines[i].padRight(panelWidth-2);
+      stdout.writeln(chalk.yellow('│') + chalk.bold(line) + chalk.yellow('│'));
+    }
+    stdout.write(' ' * left);
+    stdout.writeln(chalk.yellow('└' + '─' * (panelWidth-2) + '┘'));
+    // Wait for Enter
+    stdin.readLineSync();
+    draw();
+  }
+
   Future<void> run() async {
     stdin.echoMode = true;
     stdin.lineMode = true;
@@ -199,6 +238,9 @@ class TuiChatApp {
       inputBuffer = '';
       if (input == '/refresh') {
         draw();
+        continue;
+      } else if (input == '/?') {
+        showHelpPanel();
         continue;
       } else if (input.startsWith('/switch ')) {
         var atSign = input.substring(8).trim();
