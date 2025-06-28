@@ -130,7 +130,8 @@ Future<void> atTalk(List<String> args) async {
     ..namespace = nameSpace
     ..downloadPath = '$homeDirectory/.$nameSpace/files'
     ..isLocalStoreRequired = true
-    ..commitLogPath = '$homeDirectory/.$nameSpace/$fromAtsign/$uuid/storage/commitLog'
+    ..commitLogPath =
+        '$homeDirectory/.$nameSpace/$fromAtsign/$uuid/storage/commitLog'
     ..rootDomain = rootDomain
     ..fetchOfflineNotifications = true
     ..atKeysFilePath = atsignFile
@@ -190,7 +191,8 @@ Future<void> atTalk(List<String> args) async {
       final from = data['from'] as String? ?? notification.from;
       final msg = data['msg'] as String? ?? value;
       // Exclude my own atSign from the group, but always include the creator (from)
-      final filteredGroup = group.where((a) => a != fromAtsign).toSet().toList();
+      final filteredGroup =
+          group.where((a) => a != fromAtsign).toSet().toList();
       if (!filteredGroup.contains(from)) filteredGroup.add(from);
       filteredGroup.sort();
       final groupKey = filteredGroup.join(',');
@@ -199,7 +201,8 @@ Future<void> atTalk(List<String> args) async {
       tui.draw();
     } catch (e) {
       // fallback: treat as plain message
-      tui.addMessage(notification.from, notification.value ?? '', incoming: true);
+      tui.addMessage(notification.from, notification.value ?? '',
+          incoming: true);
       tui.draw();
     }
   }),
@@ -225,14 +228,13 @@ Future<void> atTalk(List<String> args) async {
         ..sharedWith = atSign
         ..namespace = nameSpace
         ..metadata = metaData;
-      var payload = jsonEncode({
-        'group': group,
-        'from': fromAtsign,
-        'msg': message
-      });
-      var success = await sendNotification(atClient.notificationService, key, payload, logger);
+      var payload =
+          jsonEncode({'group': group, 'from': fromAtsign, 'msg': message});
+      var success = await sendNotification(
+          atClient.notificationService, key, payload, logger);
       if (!success) {
-        tui.addMessage(groupKey, '[Error: Unable to send to $atSign]', incoming: true);
+        tui.addMessage(groupKey, '[Error: Unable to send to $atSign]',
+            incoming: true);
         tui.draw();
       }
     }

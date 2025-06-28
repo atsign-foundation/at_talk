@@ -126,16 +126,28 @@ class TuiChatApp {
     // Show group participants in chat pane header
     if (activeSession != null) {
       var session = sessions[activeSession!]!;
-      var participants = session.participants.join(', ');
-      stdout.writeln(chalk.cyan('Participants: ') + chalk.bold(participants));
+      // List my atSign first, highlight it, then others
+      var sortedParticipants = [
+        myAtSign,
+        ...session.participants.where((p) => p != myAtSign)
+      ];
+      var participants = sortedParticipants
+          .map((p) => p == myAtSign ? chalk.yellow.bold(p) : chalk.cyan(p))
+          .join(', ');
+      stdout.writeln(chalk.cyan('Participants: ') + participants);
+      // Draw a line under participants, joining the session list and chat window
+      stdout.write(chalk.yellow('├' + '─' * (sessionWidth - 1)));
+      stdout.writeln(chalk.yellow('┼' + '─' * (chatWidth - 1)));
     }
     // Prepare chat lines for active session
     List<String> chatLines = [];
     if (activeSession != null) {
       var session = sessions[activeSession!]!;
       int maxLines = chatHeight;
-      int start = (session.messages.length - maxLines - session.scrollOffset).clamp(0, session.messages.length);
-      int end = (session.messages.length - session.scrollOffset).clamp(0, session.messages.length);
+      int start = (session.messages.length - maxLines - session.scrollOffset)
+          .clamp(0, session.messages.length);
+      int end = (session.messages.length - session.scrollOffset)
+          .clamp(0, session.messages.length);
       for (int i = start; i < end; i++) {
         chatLines.add(session.messages[i]);
       }
@@ -151,8 +163,22 @@ class TuiChatApp {
       if (i < sessionList.length) {
         var s = sessionList[i];
         var marker = (i == windowOffset) ? chalk.yellow('>') : ' ';
-        var unread = sessions[s]!.unreadCount > 0 ? chalk.red('(${sessions[s]!.unreadCount})') : '';
-        sessionLine = marker + ' ' + s.padRight(sessionWidth - 6 - marker.length) + unread.toString().padRight(5 - marker.length);
+        // Format unread count: left, no brackets, two digits, ** for >99
+        int unread = sessions[s]!.unreadCount;
+        String unreadStr = '';
+        if (unread > 0) {
+          if (unread > 99) {
+            unreadStr = chalk.red.bold('** ');
+          } else {
+            unreadStr = chalk.red.bold(unread.toString().padLeft(2, '0') + ' ');
+          }
+        } else {
+          unreadStr = '   ';
+        }
+        sessionLine = unreadStr +
+            marker +
+            ' ' +
+            s.padRight(sessionWidth - 6 - marker.length);
       } else {
         sessionLine = ' '.padRight(sessionWidth);
       }
@@ -214,20 +240,20 @@ class TuiChatApp {
     ];
     int panelWidth = 48;
     int panelHeight = helpLines.length + 2;
-    int left = ((termWidth - panelWidth) ~/ 2).clamp(0, termWidth-1);
-    int top = ((termHeight - panelHeight) ~/ 2).clamp(0, termHeight-1);
+    int left = ((termWidth - panelWidth) ~/ 2).clamp(0, termWidth - 1);
+    int top = ((termHeight - panelHeight) ~/ 2).clamp(0, termHeight - 1);
     // Draw panel border
     stdout.write('\x1b[2J\x1b[H');
     for (int i = 0; i < top; i++) stdout.writeln();
     stdout.write(' ' * left);
-    stdout.writeln(chalk.yellow('┌' + '─' * (panelWidth-2) + '┐'));
+    stdout.writeln(chalk.yellow('┌' + '─' * (panelWidth - 2) + '┐'));
     for (int i = 0; i < helpLines.length; i++) {
       stdout.write(' ' * left);
-      String line = helpLines[i].padRight(panelWidth-2);
+      String line = helpLines[i].padRight(panelWidth - 2);
       stdout.writeln(chalk.yellow('│') + chalk.bold(line) + chalk.yellow('│'));
     }
     stdout.write(' ' * left);
-    stdout.writeln(chalk.yellow('└' + '─' * (panelWidth-2) + '┘'));
+    stdout.writeln(chalk.yellow('└' + '─' * (panelWidth - 2) + '┘'));
     // Wait for Enter
     stdin.readLineSync();
     draw();
@@ -269,7 +295,11 @@ class TuiChatApp {
         switchSession(id);
       } else if (input.startsWith('/new ')) {
         var rest = input.substring(5).trim();
-        var ids = rest.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+        var ids = rest
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
         if (ids.length == 1) {
           addSession(ids[0], ids);
           switchSession(ids[0]);
