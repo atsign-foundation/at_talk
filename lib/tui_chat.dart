@@ -99,7 +99,7 @@ class TuiChatApp {
     final chatHeight = termHeight - 5; // header + input + borders
     stdout.write('\x1b[2J\x1b[H'); // Clear screen
     // Header
-    stdout.writeln(chalk.bold('atTalk TUI - @${myAtSign}').padRight(termWidth));
+    stdout.writeln(chalk.bold('atTalk TUI - ${myAtSign}').padRight(termWidth));
     stdout.writeln('─' * termWidth);
     // Prepare chat lines for active session
     List<String> chatLines = [];
