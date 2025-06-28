@@ -5,7 +5,6 @@ import 'package:at_talk/tui_chat.dart';
 
 // external packages
 import 'package:args/args.dart';
-import 'package:at_talk/pipe_print.dart';
 import 'package:at_talk/service_factories.dart';
 import 'package:logging/src/level.dart';
 import 'package:chalkdart/chalk.dart';
@@ -72,7 +71,7 @@ Future<void> atTalk(List<String> args) async {
   String nameSpace = 'ai6bh';
   String rootDomain = 'root.atsign.org';
   String? message;
-  bool hasTerminal = true;
+  bool hasTerminal = stdin.hasTerminal;
 
   try {
     // Arg check
@@ -174,11 +173,30 @@ Future<void> atTalk(List<String> args) async {
   // Current atClient is the one which the onboardingService just authenticated
   AtClient atClient = AtClientManager.getInstance().atClient;
 
-  // If -m is used, send message(s) and exit cleanly
+  // If no terminal, read from stdin (pipe mode)
+  if (!hasTerminal && message == null) {
+    try {
+      // Read all input from stdin
+      List<String> lines = [];
+      await for (final line in stdin.transform(utf8.decoder).transform(const LineSplitter())) {
+        lines.add(line);
+      }
+      if (lines.isNotEmpty) {
+        message = "file sent\n" + lines.join('\n');
+      }
+    } catch (e) {
+      stderr.writeln('Error reading from stdin: $e');
+      exit(1);
+    }
+  }
+
+  // If -m is used OR pipe input, send message(s) and exit cleanly
   if (message != null && message.isNotEmpty) {
     // Support comma-separated list for -t
     var recipients = toAtsign.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toSet().toList();
     final group = recipients.toSet().toList()..sort();
+    
+    bool allSuccess = true;
     for (final atSign in group) {
       if (atSign == fromAtsign) continue;
       var metaData = Metadata()
@@ -194,11 +212,37 @@ Future<void> atTalk(List<String> args) async {
       var payload = jsonEncode({'group': group, 'from': fromAtsign, 'msg': message});
       var success = await sendNotification(atClient.notificationService, key, payload, logger);
       if (!success) {
-        stdout.writeln(chalk.red('[Error: Unable to send to $atSign]'));
+        if (hasTerminal) {
+          stdout.writeln(chalk.red('[Error: Unable to send to $atSign]'));
+        } else {
+          stderr.writeln('[Error: Unable to send to $atSign]');
+        }
+        allSuccess = false;
+      } else {
+        if (!hasTerminal) {
+          stderr.writeln('Message sent to $atSign');
+        }
       }
     }
-    stdout.writeln(chalk.green('Message sent.'));
-    exit(0);
+    
+    if (hasTerminal) {
+      stdout.writeln(chalk.green('Message sent.'));
+    } else {
+      if (allSuccess) {
+        stderr.writeln('All messages sent successfully.');
+        exit(0);
+      } else {
+        stderr.writeln('Some messages failed to send.');
+        exit(1);
+      }
+    }
+    exit(allSuccess ? 0 : 1);
+  }
+
+  // Only start TUI if we have a terminal
+  if (!hasTerminal) {
+    stderr.writeln('No terminal available and no message to send');
+    exit(1);
   }
 
   // Start TUI chat app
