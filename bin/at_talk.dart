@@ -137,17 +137,17 @@ Future<void> atTalk(List<String> args) async {
     ..atKeysFilePath = atsignFile
     ..atProtocolEmitted = Version(2, 0, 0);
 
-  var metaData = Metadata()
-    ..isPublic = false
-    ..isEncrypted = true
-    ..namespaceAware = true;
+  // var metaData = Metadata()
+  //   ..isPublic = false
+  //   ..isEncrypted = true
+  //   ..namespaceAware = true;
 
-  var key = AtKey()
-    ..key = 'attalk'
-    ..sharedBy = fromAtsign
-    ..sharedWith = toAtsign
-    ..namespace = nameSpace
-    ..metadata = metaData;
+  // var key = AtKey()
+  //   ..key = 'attalk'
+  //   ..sharedBy = fromAtsign
+  //   ..sharedWith = toAtsign
+  //   ..namespace = nameSpace
+  //   ..metadata = metaData;
 
   AtOnboardingService onboardingService = AtOnboardingServiceImpl(
       fromAtsign, atOnboardingConfig,
@@ -174,9 +174,48 @@ Future<void> atTalk(List<String> args) async {
   // Current atClient is the one which the onboardingService just authenticated
   AtClient atClient = AtClientManager.getInstance().atClient;
 
+  // If -m is used, send message(s) and exit cleanly
+  if (message != null && message.isNotEmpty) {
+    // Support comma-separated list for -t
+    var recipients = toAtsign.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toSet().toList();
+    final group = recipients.toSet().toList()..sort();
+    for (final atSign in group) {
+      if (atSign == fromAtsign) continue;
+      var metaData = Metadata()
+        ..isPublic = false
+        ..isEncrypted = true
+        ..namespaceAware = true;
+      var key = AtKey()
+        ..key = 'attalk'
+        ..sharedBy = fromAtsign
+        ..sharedWith = atSign
+        ..namespace = nameSpace
+        ..metadata = metaData;
+      var payload = jsonEncode({'group': group, 'from': fromAtsign, 'msg': message});
+      var success = await sendNotification(atClient.notificationService, key, payload, logger);
+      if (!success) {
+        stdout.writeln(chalk.red('[Error: Unable to send to $atSign]'));
+      }
+    }
+    stdout.writeln(chalk.green('Message sent.'));
+    exit(0);
+  }
+
   // Start TUI chat app
   final tui = TuiChatApp(fromAtsign);
-  tui.addSession(toAtsign);
+
+  // If -m is not used, support group chat creation from comma-separated -t
+  List<String> participants = toAtsign.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toSet().toList();
+  if (participants.length > 1) {
+    // Group chat: use sorted group key
+    final groupKey = (participants..sort()).join(',');
+    tui.addSession(groupKey, participants);
+    tui.switchSession(groupKey);
+  } else {
+    // Single chat
+    tui.addSession(toAtsign);
+    tui.switchSession(toAtsign);
+  }
 
   // Listen for incoming messages
   atClient.notificationService
@@ -197,7 +236,12 @@ Future<void> atTalk(List<String> args) async {
       filteredGroup.sort();
       final groupKey = filteredGroup.join(',');
       tui.addSession(group.length > 1 ? groupKey : from, filteredGroup);
-      tui.addMessage(group.length > 1 ? groupKey : from, msg, incoming: true);
+      tui.addMessage(
+        group.length > 1 ? groupKey : from,
+        msg,
+        incoming: true,
+        sender: from,
+      );
       tui.draw();
     } catch (e) {
       // fallback: treat as plain message

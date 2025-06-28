@@ -58,9 +58,12 @@ class TuiChatApp {
     redrawRequested = true;
   }
 
-  void addMessage(String id, String message, {bool incoming = false}) {
+  void addMessage(String id, String message, {bool incoming = false, String? sender}) {
     addSession(id);
-    final prefix = incoming ? chalk.green('$id: ') : chalk.blue('me: ');
+    // For group messages, show sender's atSign; for outgoing, show 'me:'
+    final prefix = incoming
+        ? (sender != null ? chalk.green('$sender: ') : chalk.green('$id: '))
+        : chalk.yellow('me: ');
     sessions[id]!.messages.add(prefix + message);
     if (incoming && activeSession != id) {
       sessions[id]!.unreadCount++;
