@@ -13,6 +13,7 @@ class ChatSession {
   final String atSign;
   final List<String> messages = [];
   int scrollOffset = 0; // For scrolling
+  int unreadCount = 0; // Track unread messages
   ChatSession(this.atSign);
 }
 
@@ -41,6 +42,9 @@ class TuiChatApp {
     addSession(atSign); // Always ensure the session exists
     activeSession = atSign;
     windowOffset = sessionList.indexOf(atSign);
+    // Mark all as read
+    sessions[atSign]!.unreadCount = 0;
+    requestRedraw();
   }
 
   void requestRedraw() {
@@ -51,6 +55,9 @@ class TuiChatApp {
     addSession(atSign);
     final prefix = incoming ? chalk.green('$atSign: ') : chalk.blue('me: ');
     sessions[atSign]!.messages.add(prefix + message);
+    if (incoming && activeSession != atSign) {
+      sessions[atSign]!.unreadCount++;
+    }
     if (activeSession == atSign) {
       requestRedraw();
     }
@@ -94,36 +101,37 @@ class TuiChatApp {
     // Header
     stdout.writeln(chalk.bold('atTalk TUI - @${myAtSign}').padRight(termWidth));
     stdout.writeln('─' * termWidth);
-    // Session list (left)
+    // Prepare chat lines for active session
+    List<String> chatLines = [];
+    if (activeSession != null) {
+      var session = sessions[activeSession!]!;
+      int maxLines = chatHeight;
+      int start = (session.messages.length - maxLines - session.scrollOffset).clamp(0, session.messages.length);
+      int end = (session.messages.length - session.scrollOffset).clamp(0, session.messages.length);
+      for (int i = start; i < end; i++) {
+        chatLines.add(session.messages[i]);
+      }
+      while (chatLines.length < chatHeight) {
+        chatLines.insert(0, '');
+      }
+    } else {
+      chatLines = List.filled(chatHeight, '');
+    }
+    // Session list (left) and chat pane (right)
     for (int i = 0; i < chatHeight; i++) {
       String sessionLine = '';
       if (i < sessionList.length) {
         var s = sessionList[i];
         var marker = (i == windowOffset) ? chalk.yellow('>') : ' ';
-        sessionLine = marker + ' ' + s.padRight(sessionWidth - 2);
+        var unread = sessions[s]!.unreadCount > 0 ? chalk.red('(${sessions[s]!.unreadCount})') : '';
+        sessionLine = marker + ' ' + s.padRight(sessionWidth - 6 - marker.length) + unread.toString().padRight(5 - marker.length);
       } else {
         sessionLine = ' '.padRight(sessionWidth);
       }
       stdout.write(sessionLine);
       stdout.write(chalk.yellow('│'));
-      // Chat window (center)
-      if (activeSession != null) {
-        var s = activeSession!;
-        var session = sessions[s]!;
-        int maxLines = chatHeight;
-        int start = (session.messages.length - maxLines - session.scrollOffset).clamp(0, session.messages.length);
-        int end = (session.messages.length - session.scrollOffset).clamp(0, session.messages.length);
-        int msgIdx = i + start;
-        if (msgIdx < end) {
-          var msg = session.messages[msgIdx];
-          stdout.write(msg.padRight(chatWidth));
-        } else {
-          stdout.write(' '.padRight(chatWidth));
-        }
-      } else {
-        stdout.write(' '.padRight(chatWidth));
-      }
-      stdout.writeln();
+      // Print chat line for this row
+      stdout.writeln(chatLines[i].padRight(chatWidth));
     }
     stdout.writeln('─' * termWidth);
     // Draw input at the last line
