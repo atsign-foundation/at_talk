@@ -91,6 +91,11 @@ class TuiChatApp {
     }
   }
 
+  // Utility to strip ANSI color codes for width calculation
+  String stripAnsi(String input) {
+    return input.replaceAll(RegExp(r'\x1B\[[0-9;]*m'), '');
+  }
+
   void draw() {
     final termWidth = stdout.hasTerminal ? stdout.terminalColumns : 80;
     final termHeight = stdout.hasTerminal ? stdout.terminalLines : 24;
@@ -128,7 +133,31 @@ class TuiChatApp {
       } else {
         sessionLine = ' '.padRight(sessionWidth);
       }
-      stdout.write(sessionLine);
+      // Pad/truncate sessionLine so | is always at the same visible column
+      int visibleLen = stripAnsi(sessionLine).length;
+      if (visibleLen < sessionWidth) {
+        stdout.write(sessionLine + ' ' * (sessionWidth - visibleLen));
+      } else if (visibleLen > sessionWidth) {
+        // Truncate visible part, but keep color codes
+        int count = 0;
+        String out = '';
+        for (int j = 0; j < sessionLine.length && count < sessionWidth; j++) {
+          if (sessionLine[j] == '\x1B') {
+            // Start of ANSI code
+            int m = sessionLine.indexOf('m', j);
+            if (m != -1) {
+              out += sessionLine.substring(j, m + 1);
+              j = m;
+            }
+          } else {
+            out += sessionLine[j];
+            count++;
+          }
+        }
+        stdout.write(out);
+      } else {
+        stdout.write(sessionLine);
+      }
       stdout.write(chalk.yellow('│'));
       // Print chat line for this row
       stdout.writeln(chatLines[i].padRight(chatWidth));
