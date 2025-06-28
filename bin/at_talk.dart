@@ -181,12 +181,25 @@ Future<void> atTalk(List<String> args) async {
   atClient.notificationService
       .subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true)
       .listen(((notification) async {
-    String keyAtsign = notification.key;
-    keyAtsign = keyAtsign.replaceAll('${notification.to}:', '');
-    keyAtsign = keyAtsign.replaceAll('.$nameSpace${notification.from}', '');
-    if (keyAtsign == 'attalk') {
-      var talk = notification.value!;
-      tui.addMessage(notification.from, talk, incoming: true);
+    try {
+      final value = notification.value;
+      if (value == null) return;
+      final data = jsonDecode(value);
+      if (data is! Map) return;
+      final group = (data['group'] as List).map((e) => e.toString()).toList();
+      final from = data['from'] as String? ?? notification.from;
+      final msg = data['msg'] as String? ?? value;
+      // Exclude my own atSign from the group, but always include the creator (from)
+      final filteredGroup = group.where((a) => a != fromAtsign).toSet().toList();
+      if (!filteredGroup.contains(from)) filteredGroup.add(from);
+      filteredGroup.sort();
+      final groupKey = filteredGroup.join(',');
+      tui.addSession(group.length > 1 ? groupKey : from, filteredGroup);
+      tui.addMessage(group.length > 1 ? groupKey : from, msg, incoming: true);
+      tui.draw();
+    } catch (e) {
+      // fallback: treat as plain message
+      tui.addMessage(notification.from, notification.value ?? '', incoming: true);
       tui.draw();
     }
   }),
@@ -194,21 +207,34 @@ Future<void> atTalk(List<String> args) async {
           onDone: () => logger.info('Notification listener stopped'));
 
   // Outgoing message handler
-  tui.onSend = (String toAtsign, String message) async {
-    var metaData = Metadata()
-      ..isPublic = false
-      ..isEncrypted = true
-      ..namespaceAware = true;
-    var key = AtKey()
-      ..key = 'attalk'
-      ..sharedBy = fromAtsign
-      ..sharedWith = toAtsign
-      ..namespace = nameSpace
-      ..metadata = metaData;
-    var success = await sendNotification(atClient.notificationService, key, message, logger);
-    if (!success) {
-      tui.addMessage(toAtsign, '[Error: Unable to send message]', incoming: true);
-      tui.draw();
+  tui.onSend = (String sessionId, String message) async {
+    final session = tui.sessions[sessionId];
+    if (session == null) return;
+    // Always send to all group members except self, using the full group list as the group key
+    final group = session.participants.toSet().toList()..sort();
+    final groupKey = group.join(',');
+    for (final atSign in group) {
+      if (atSign == fromAtsign) continue;
+      var metaData = Metadata()
+        ..isPublic = false
+        ..isEncrypted = true
+        ..namespaceAware = true;
+      var key = AtKey()
+        ..key = 'attalk'
+        ..sharedBy = fromAtsign
+        ..sharedWith = atSign
+        ..namespace = nameSpace
+        ..metadata = metaData;
+      var payload = jsonEncode({
+        'group': group,
+        'from': fromAtsign,
+        'msg': message
+      });
+      var success = await sendNotification(atClient.notificationService, key, payload, logger);
+      if (!success) {
+        tui.addMessage(groupKey, '[Error: Unable to send to $atSign]', incoming: true);
+        tui.draw();
+      }
     }
   };
 

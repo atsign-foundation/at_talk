@@ -10,11 +10,12 @@ import 'dart:convert';
 // For a real-world app, you would want to refactor and modularize this further.
 
 class ChatSession {
-  final String atSign;
+  final String id; // could be single atSign or group id
+  final List<String> participants;
   final List<String> messages = [];
-  int scrollOffset = 0; // For scrolling
-  int unreadCount = 0; // Track unread messages
-  ChatSession(this.atSign);
+  int scrollOffset = 0;
+  int unreadCount = 0;
+  ChatSession(this.id, this.participants);
 }
 
 class TuiChatApp {
@@ -33,17 +34,23 @@ class TuiChatApp {
 
   TuiChatApp(this.myAtSign);
 
-  void addSession(String atSign) {
-    sessions.putIfAbsent(atSign, () => ChatSession(atSign));
-    activeSession ??= atSign;
+  void addSession(String id, [List<String>? participants]) {
+    if (!sessions.containsKey(id)) {
+      sessions[id] = ChatSession(id, participants ?? [id]);
+    } else if (participants != null) {
+      // Always update the participant list to the latest (for group chats)
+      sessions[id]!.participants
+        ..clear()
+        ..addAll(participants);
+    }
+    activeSession ??= id;
   }
 
-  void switchSession(String atSign) {
-    addSession(atSign); // Always ensure the session exists
-    activeSession = atSign;
-    windowOffset = sessionList.indexOf(atSign);
-    // Mark all as read
-    sessions[atSign]!.unreadCount = 0;
+  void switchSession(String id) {
+    addSession(id);
+    activeSession = id;
+    windowOffset = sessionList.indexOf(id);
+    sessions[id]!.unreadCount = 0;
     requestRedraw();
   }
 
@@ -51,14 +58,14 @@ class TuiChatApp {
     redrawRequested = true;
   }
 
-  void addMessage(String atSign, String message, {bool incoming = false}) {
-    addSession(atSign);
-    final prefix = incoming ? chalk.green('$atSign: ') : chalk.blue('me: ');
-    sessions[atSign]!.messages.add(prefix + message);
-    if (incoming && activeSession != atSign) {
-      sessions[atSign]!.unreadCount++;
+  void addMessage(String id, String message, {bool incoming = false}) {
+    addSession(id);
+    final prefix = incoming ? chalk.green('$id: ') : chalk.blue('me: ');
+    sessions[id]!.messages.add(prefix + message);
+    if (incoming && activeSession != id) {
+      sessions[id]!.unreadCount++;
     }
-    if (activeSession == atSign) {
+    if (activeSession == id) {
       requestRedraw();
     }
   }
@@ -116,6 +123,12 @@ class TuiChatApp {
     // Header
     stdout.writeln(chalk.bold('atTalk TUI - ${myAtSign}').padRight(termWidth));
     stdout.writeln('─' * termWidth);
+    // Show group participants in chat pane header
+    if (activeSession != null) {
+      var session = sessions[activeSession!]!;
+      var participants = session.participants.join(', ');
+      stdout.writeln(chalk.cyan('Participants: ') + chalk.bold(participants));
+    }
     // Prepare chat lines for active session
     List<String> chatLines = [];
     if (activeSession != null) {
@@ -220,18 +233,27 @@ class TuiChatApp {
     draw();
   }
 
+  void deleteSession(String id) {
+    if (sessions.containsKey(id)) {
+      sessions.remove(id);
+      if (activeSession == id) {
+        activeSession = sessions.isNotEmpty ? sessionList.first : null;
+        windowOffset = 0;
+      }
+      requestRedraw();
+    }
+  }
+
   Future<void> run() async {
     stdin.echoMode = true;
     stdin.lineMode = true;
     draw();
-    // Listen for incoming messages and redraw
     Timer.periodic(Duration(milliseconds: 100), (_) {
       if (redrawRequested) {
         draw();
         redrawRequested = false;
       }
     });
-    // Read lines from stdin
     var lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
     await for (final line in lines) {
       String input = line.trim();
@@ -243,12 +265,20 @@ class TuiChatApp {
         showHelpPanel();
         continue;
       } else if (input.startsWith('/switch ')) {
-        var atSign = input.substring(8).trim();
-        switchSession(atSign);
+        var id = input.substring(8).trim();
+        switchSession(id);
       } else if (input.startsWith('/new ')) {
-        var atSign = input.substring(5).trim();
-        addSession(atSign);
-        switchSession(atSign);
+        var rest = input.substring(5).trim();
+        var ids = rest.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+        if (ids.length == 1) {
+          addSession(ids[0], ids);
+          switchSession(ids[0]);
+        } else if (ids.length > 1) {
+          var groupId = ids.toSet().toList()..sort();
+          var groupKey = groupId.join(',');
+          addSession(groupKey, groupId);
+          switchSession(groupKey);
+        }
       } else if (input == '/next') {
         nextWindow();
       } else if (input == '/prev') {
@@ -257,6 +287,8 @@ class TuiChatApp {
         scrollUp();
       } else if (input == '/down') {
         scrollDown();
+      } else if (input == '/delete') {
+        if (activeSession != null) deleteSession(activeSession!);
       } else if (input == '/exit') {
         break;
       } else if (activeSession != null && input.isNotEmpty) {
