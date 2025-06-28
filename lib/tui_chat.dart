@@ -67,12 +67,22 @@ class TuiChatApp {
     if (sessions.isEmpty) return;
     windowOffset = (windowOffset + 1) % sessions.length;
     activeSession = sessionList[windowOffset];
+    // Mark all as read when switching
+    if (sessions[activeSession!]!.unreadCount > 0) {
+      sessions[activeSession!]!.unreadCount = 0;
+      requestRedraw();
+    }
   }
 
   void prevWindow() {
     if (sessions.isEmpty) return;
     windowOffset = (windowOffset - 1 + sessions.length) % sessions.length;
     activeSession = sessionList[windowOffset];
+    // Mark all as read when switching
+    if (sessions[activeSession!]!.unreadCount > 0) {
+      sessions[activeSession!]!.unreadCount = 0;
+      requestRedraw();
+    }
   }
 
   void scrollUp() {
@@ -185,6 +195,10 @@ class TuiChatApp {
     // Read lines from stdin
     var lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
     await for (final line in lines) {
+      if (line == String.fromCharCode(12)) { // Ctrl+L
+        draw();
+        continue;
+      }
       String input = line.trim();
       inputBuffer = '';
       if (input.startsWith('/switch ')) {
