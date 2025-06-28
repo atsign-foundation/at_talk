@@ -195,13 +195,12 @@ class TuiChatApp {
     // Read lines from stdin
     var lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
     await for (final line in lines) {
-      if (line == String.fromCharCode(12)) { // Ctrl+L
-        draw();
-        continue;
-      }
       String input = line.trim();
       inputBuffer = '';
-      if (input.startsWith('/switch ')) {
+      if (input == '/refresh') {
+        draw();
+        continue;
+      } else if (input.startsWith('/switch ')) {
         var atSign = input.substring(8).trim();
         switchSession(atSign);
       } else if (input.startsWith('/new ')) {
