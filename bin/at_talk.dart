@@ -1,6 +1,7 @@
 import 'dart:io';
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
+import 'package:at_talk/tui_chat.dart';
 
 // external packages
 import 'package:args/args.dart';
@@ -8,6 +9,7 @@ import 'package:at_talk/pipe_print.dart';
 import 'package:at_talk/service_factories.dart';
 import 'package:logging/src/level.dart';
 import 'package:chalkdart/chalk.dart';
+import 'package:uuid/uuid.dart';
 
 // atPlatform packages
 import 'package:at_client/at_client.dart';
@@ -54,6 +56,8 @@ Future<void> atTalk(List<String> args) async {
       help: 'Root Domain (defaults to root.atsign.org)');
   parser.addOption('namespace',
       abbr: 'n', mandatory: false, help: 'Namespace (defaults to ai6bh)');
+  parser.addOption('message',
+      abbr: 'm', mandatory: false, help: 'send a message then exit');
   parser.addFlag('verbose', abbr: 'v', help: 'More logging', negatable: false);
   parser.addFlag('never-sync',
       help: 'Completely disable sync', negatable: false);
@@ -67,6 +71,7 @@ Future<void> atTalk(List<String> args) async {
   String? homeDirectory = getHomeDirectory();
   String nameSpace = 'ai6bh';
   String rootDomain = 'root.atsign.org';
+  String? message;
   bool hasTerminal = true;
 
   try {
@@ -82,6 +87,9 @@ Future<void> atTalk(List<String> args) async {
 
     if (parsedArgs['namespace'] != null) {
       nameSpace = parsedArgs['namespace'];
+    }
+    if (parsedArgs['message'] != null) {
+      message = parsedArgs['message'];
     }
 
     if (parsedArgs['key-file'] != null) {
@@ -115,13 +123,14 @@ Future<void> atTalk(List<String> args) async {
     AtSignLogger.root_level = 'INFO';
   }
 
+  Uuid uuid = Uuid();
   //onboarding preference builder can be used to set onboardingService parameters
   AtOnboardingPreference atOnboardingConfig = AtOnboardingPreference()
-    ..hiveStoragePath = '$homeDirectory/.$nameSpace/$fromAtsign/storage'
+    ..hiveStoragePath = '$homeDirectory/.$nameSpace/$fromAtsign/$uuid/storage'
     ..namespace = nameSpace
     ..downloadPath = '$homeDirectory/.$nameSpace/files'
     ..isLocalStoreRequired = true
-    ..commitLogPath = '$homeDirectory/.$nameSpace/$fromAtsign/storage/commitLog'
+    ..commitLogPath = '$homeDirectory/.$nameSpace/$fromAtsign/$uuid/storage/commitLog'
     ..rootDomain = rootDomain
     ..fetchOfflineNotifications = true
     ..atKeysFilePath = atsignFile
@@ -149,7 +158,7 @@ Future<void> atTalk(List<String> args) async {
       stdout.write(chalk.brightBlue('\r\x1b[KConnecting ... '));
       await Future.delayed(Duration(
           milliseconds:
-          1000)); // Pause just long enough for the retry to be visible
+              1000)); // Pause just long enough for the retry to be visible
       onboarded = await onboardingService.authenticate();
     } catch (exception) {
       stdout.write(chalk.brightRed(
@@ -164,6 +173,11 @@ Future<void> atTalk(List<String> args) async {
   // Current atClient is the one which the onboardingService just authenticated
   AtClient atClient = AtClientManager.getInstance().atClient;
 
+  // Start TUI chat app
+  final tui = TuiChatApp(fromAtsign);
+  tui.addSession(toAtsign);
+
+  // Listen for incoming messages
   atClient.notificationService
       .subscribe(regex: 'attalk.$nameSpace@', shouldDecrypt: true)
       .listen(((notification) async {
@@ -171,83 +185,35 @@ Future<void> atTalk(List<String> args) async {
     keyAtsign = keyAtsign.replaceAll('${notification.to}:', '');
     keyAtsign = keyAtsign.replaceAll('.$nameSpace${notification.from}', '');
     if (keyAtsign == 'attalk') {
-      logger.info('atTalk update received from ${notification.from} notification id : ${notification.id}');
       var talk = notification.value!;
-      // Terminal Control
-      // '\r\x1b[K' is used to set the cursor back to the beginning of the line then deletes to the end of line
-      //
-      print(chalk.brightGreen.bold('\r\x1b[K${notification.from}: ') +
-          chalk.brightGreen(talk));
-
-      pipePrint('$fromAtsign: ');
+      tui.addMessage(notification.from, talk, incoming: true);
+      tui.draw();
     }
   }),
-      onError: (e) => logger.severe('Notification Failed:$e'),
-      onDone: () => logger.info('Notification listener stopped'));
+          onError: (e) => logger.severe('Notification Failed:$e'),
+          onDone: () => logger.info('Notification listener stopped'));
 
-  String input = "";
-  String buffer = "";
-  pipePrint('$fromAtsign: ');
-
-  var lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
-
-  await for (final l in lines) {
-    pipePrint('$fromAtsign: ');
-    input = l;
-    if (input == '/exit') {
-      exit(0);
-    }
-    if (input.startsWith(RegExp('^/@'))) {
-      toAtsign = input.replaceFirst(RegExp('^/'), '');
-      print('now talking to: $toAtsign');
-      input = '';
-    }
-
-    if (generateCommandRegEx.hasMatch(input)) {
-      int length = int.parse(input.split(' ')[1]);
-      input = String.fromCharCodes(
-          Iterable.generate(length, (index) => digits.codeUnitAt(index % 10)));
-    }
-
+  // Outgoing message handler
+  tui.onSend = (String toAtsign, String message) async {
     var metaData = Metadata()
       ..isPublic = false
       ..isEncrypted = true
       ..namespaceAware = true;
-
-
     var key = AtKey()
       ..key = 'attalk'
       ..sharedBy = fromAtsign
       ..sharedWith = toAtsign
       ..namespace = nameSpace
       ..metadata = metaData;
-
-    if (!(input == "")) {
-      if (!(stdin.hasTerminal)) {
-        hasTerminal = false;
-        buffer = '$buffer\n\r$input';
-      } else {
-        hasTerminal = true;
-        var success =
-        sendNotification(atClient.notificationService, key, input, logger);
-        if (!await success) {
-          print('${chalk.brightRed.bold('\r\x1b[KError Sending: ')}"$input" to $toAtsign - unable to reach the Internet !');
-          pipePrint('$fromAtsign: ');
-        }
-      }
+    var success = await sendNotification(atClient.notificationService, key, message, logger);
+    if (!success) {
+      tui.addMessage(toAtsign, '[Error: Unable to send message]', incoming: true);
+      tui.draw();
     }
-  }
+  };
 
-// Send file contents if stdin has no terminal
-  if (!(hasTerminal)) {
-    var success = sendNotification(atClient.notificationService, key,
-        chalk.brightBlue('Sending a file') + chalk.white(buffer), logger);
-    if (!await success) {
-      print('${chalk.brightRed.bold('\r\x1b[KError Sending: ')}"$input" to $toAtsign - unable to reach the Internet !');
-      pipePrint('$fromAtsign: ');
-    }
-  }
-
+  // Run the TUI
+  await tui.run();
   exit(0);
 }
 
