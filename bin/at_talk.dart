@@ -178,7 +178,8 @@ Future<void> atTalk(List<String> args) async {
     try {
       // Read all input from stdin
       List<String> lines = [];
-      await for (final line in stdin.transform(utf8.decoder).transform(const LineSplitter())) {
+      await for (final line
+          in stdin.transform(utf8.decoder).transform(const LineSplitter())) {
         lines.add(line);
       }
       if (lines.isNotEmpty) {
@@ -193,9 +194,14 @@ Future<void> atTalk(List<String> args) async {
   // If -m is used OR pipe input, send message(s) and exit cleanly
   if (message != null && message.isNotEmpty) {
     // Support comma-separated list for -t
-    var recipients = toAtsign.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toSet().toList();
+    var recipients = toAtsign
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .toList();
     final group = recipients.toSet().toList()..sort();
-    
+
     bool allSuccess = true;
     for (final atSign in group) {
       if (atSign == fromAtsign) continue;
@@ -209,8 +215,10 @@ Future<void> atTalk(List<String> args) async {
         ..sharedWith = atSign
         ..namespace = nameSpace
         ..metadata = metaData;
-      var payload = jsonEncode({'group': group, 'from': fromAtsign, 'msg': message});
-      var success = await sendNotification(atClient.notificationService, key, payload, logger);
+      var payload =
+          jsonEncode({'group': group, 'from': fromAtsign, 'msg': message});
+      var success = await sendNotification(
+          atClient.notificationService, key, payload, logger);
       if (!success) {
         if (hasTerminal) {
           stdout.writeln(chalk.red('[Error: Unable to send to $atSign]'));
@@ -224,7 +232,7 @@ Future<void> atTalk(List<String> args) async {
         }
       }
     }
-    
+
     if (hasTerminal) {
       stdout.writeln(chalk.green('Message sent.'));
     } else {
@@ -249,7 +257,12 @@ Future<void> atTalk(List<String> args) async {
   final tui = TuiChatApp(fromAtsign);
 
   // If -m is not used, support group chat creation from comma-separated -t
-  List<String> participants = toAtsign.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toSet().toList();
+  List<String> participants = toAtsign
+      .split(',')
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toSet()
+      .toList();
   if (participants.length > 1) {
     // Group chat: use sorted group key
     final groupKey = (participants..sort()).join(',');
