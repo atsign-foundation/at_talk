@@ -122,16 +122,16 @@ Future<void> atTalk(List<String> args) async {
     AtSignLogger.root_level = 'INFO';
   }
 
-  Uuid uuid = Uuid();
+  String uuid = Uuid().v4();
   //onboarding preference builder can be used to set onboardingService parameters
   AtOnboardingPreference atOnboardingConfig = AtOnboardingPreference()
     ..hiveStoragePath =
-        '$homeDirectory/.$nameSpace/$fromAtsign/${uuid.v5}(namespace, name)}/storage'
+        '$homeDirectory/.$nameSpace/$fromAtsign/$uuid/storage'
     ..namespace = nameSpace
-    ..downloadPath = '$homeDirectory/.$nameSpace/files'
+    ..downloadPath = '$homeDirectory/.$nameSpace/$uuid/files'
     ..isLocalStoreRequired = true
     ..commitLogPath =
-        '$homeDirectory/.$nameSpace/$fromAtsign/${uuid.v5}/storage/commitLog'
+        '$homeDirectory/.$nameSpace/$fromAtsign/$uuid/storage/commitLog'
     ..rootDomain = rootDomain
     ..fetchOfflineNotifications = true
     ..atKeysFilePath = atsignFile
