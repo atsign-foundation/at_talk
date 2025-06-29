@@ -125,12 +125,13 @@ Future<void> atTalk(List<String> args) async {
   Uuid uuid = Uuid();
   //onboarding preference builder can be used to set onboardingService parameters
   AtOnboardingPreference atOnboardingConfig = AtOnboardingPreference()
-    ..hiveStoragePath = '$homeDirectory/.$nameSpace/$fromAtsign/$uuid/storage'
+    ..hiveStoragePath =
+        '$homeDirectory/.$nameSpace/$fromAtsign/${uuid.v5}(namespace, name)}/storage'
     ..namespace = nameSpace
     ..downloadPath = '$homeDirectory/.$nameSpace/files'
     ..isLocalStoreRequired = true
     ..commitLogPath =
-        '$homeDirectory/.$nameSpace/$fromAtsign/$uuid/storage/commitLog'
+        '$homeDirectory/.$nameSpace/$fromAtsign/${uuid.v5}/storage/commitLog'
     ..rootDomain = rootDomain
     ..fetchOfflineNotifications = true
     ..atKeysFilePath = atsignFile
