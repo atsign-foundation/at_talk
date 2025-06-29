@@ -287,6 +287,10 @@ Future<void> atTalk(List<String> args) async {
       final group = (data['group'] as List).map((e) => e.toString()).toList();
       final from = data['from'] as String? ?? notification.from;
       final msg = data['msg'] as String? ?? value;
+      
+      // Ignore messages from myself to avoid duplicates
+      if (from == fromAtsign) return;
+      
       // Exclude my own atSign from the group, but always include the creator (from)
       final filteredGroup =
           group.where((a) => a != fromAtsign).toSet().toList();
@@ -302,6 +306,9 @@ Future<void> atTalk(List<String> args) async {
       );
       tui.draw();
     } catch (e) {
+      // Ignore messages from myself in fallback case too
+      if (notification.from == fromAtsign) return;
+      
       // fallback: treat as plain message
       tui.addMessage(notification.from, notification.value ?? '',
           incoming: true);
@@ -319,7 +326,7 @@ Future<void> atTalk(List<String> args) async {
     final group = session.participants.toSet().toList()..sort();
     final groupKey = group.join(',');
     for (final atSign in group) {
-      if (atSign == fromAtsign) continue;
+      // Send to everyone in the group, including myself for multi-instance support
       var metaData = Metadata()
         ..isPublic = false
         ..isEncrypted = true
