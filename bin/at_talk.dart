@@ -191,11 +191,15 @@ Future<void> atTalk(List<String> args) async {
         .where((s) => s.isNotEmpty)
         .toSet()
         .toList();
+    
+    final isGroupMessage = recipients.length > 1;
     final group = recipients.toSet().toList()..sort();
+    
+    // For multi-instance support, we need to send to ourselves too
+    final allRecipients = recipients.toSet().toList()..add(fromAtsign);
 
     bool allSuccess = true;
-    for (final atSign in group) {
-      // if (atSign == fromAtsign) continue;
+    for (final atSign in allRecipients) {
       var metaData = Metadata()
         ..isPublic = false
         ..isEncrypted = true
@@ -207,7 +211,13 @@ Future<void> atTalk(List<String> args) async {
         ..namespace = nameSpace
         ..metadata = metaData;
       var payload =
-          jsonEncode({'group': group, 'from': fromAtsign, 'msg': message, 'instanceId': instanceId});
+          jsonEncode({
+            'group': group, 
+            'from': fromAtsign, 
+            'msg': message, 
+            'instanceId': instanceId,
+            'isGroup': isGroupMessage
+          });
       var success = await sendNotification(
           atClient.notificationService, key, payload, logger);
       if (!success) {
@@ -280,23 +290,31 @@ Future<void> atTalk(List<String> args) async {
       final from = data['from'] as String? ?? notification.from;
       final msg = data['msg'] as String? ?? value;
       final messageInstanceId = data['instanceId'] as String?;
+      final isGroup = data['isGroup'] as bool? ?? false;
 
       // Skip messages from this same app instance to avoid duplicates
       if (from == fromAtsign && messageInstanceId == instanceId) return;
 
-      // For group chats, use the original group as the session key
-      // For individual chats, use the sender as the session key
+      // Use the isGroup flag to determine session handling
       String sessionKey;
       List<String> sessionParticipants;
       
-      if (group.length > 1) {
+      if (isGroup) {
         // Group chat: use all participants (including myself) for consistency
         sessionParticipants = group.toSet().toList()..sort();
         sessionKey = sessionParticipants.join(',');
       } else {
-        // Individual chat: exclude myself from the key, but include both in participants
-        sessionParticipants = [fromAtsign, from].toSet().toList()..sort();
-        sessionKey = from;
+        // Individual chat: determine the other person in the conversation
+        if (from == fromAtsign) {
+          // This is my own message from another instance
+          // The 'group' field contains the other person (the recipient)
+          sessionKey = group.isNotEmpty ? group[0] : from;
+          sessionParticipants = [fromAtsign, sessionKey].toSet().toList()..sort();
+        } else {
+          // This is a message from someone else
+          sessionKey = from;
+          sessionParticipants = [fromAtsign, from].toSet().toList()..sort();
+        }
       }
       
       tui.addSession(sessionKey, sessionParticipants);
@@ -324,11 +342,26 @@ Future<void> atTalk(List<String> args) async {
   tui.onSend = (String sessionId, String message) async {
     final session = tui.sessions[sessionId];
     if (session == null) return;
-    // Always send to all group members except self, using the full group list as the group key
-    final group = session.participants.toSet().toList()..sort();
-    final groupKey = group.join(',');
-    for (final atSign in group) {
-      // Send to everyone in the group, including myself for multi-instance support
+    
+    // Determine if this is a group chat or individual chat
+    // Individual chats have exactly 2 participants (sender and receiver)
+    // Group chats have 3 or more participants
+    final isGroupChat = session.participants.length > 2;
+    
+    List<String> recipients;
+    List<String> groupForMessage;
+    
+    if (isGroupChat) {
+      // Group chat: send to all participants (including self for multi-instance support)
+      recipients = session.participants.toSet().toList()..sort();
+      groupForMessage = recipients;
+    } else {
+      // Individual chat: send to the other person AND to myself for multi-instance support
+      recipients = session.participants.toSet().toList()..sort(); // includes both sender and receiver
+      groupForMessage = session.participants.where((p) => p != fromAtsign).toList(); // only the other person for message group
+    }
+    
+    for (final atSign in recipients) {
       var metaData = Metadata()
         ..isPublic = false
         ..isEncrypted = true
@@ -340,11 +373,17 @@ Future<void> atTalk(List<String> args) async {
         ..namespace = nameSpace
         ..metadata = metaData;
       var payload =
-          jsonEncode({'group': group, 'from': fromAtsign, 'msg': message, 'instanceId': instanceId});
+          jsonEncode({
+            'group': groupForMessage, 
+            'from': fromAtsign, 
+            'msg': message, 
+            'instanceId': instanceId,
+            'isGroup': isGroupChat
+          });
       var success = await sendNotification(
           atClient.notificationService, key, payload, logger);
       if (!success) {
-        tui.addMessage(groupKey, '[Error: Unable to send to $atSign]',
+        tui.addMessage(sessionId, '[Error: Unable to send to $atSign]',
             incoming: true);
         tui.draw();
       }
