@@ -55,7 +55,7 @@ class TuiChatApp {
         ..sort();
       if (sessionParticipants.length == sortedParticipants.length &&
           sessionParticipants.every((p) => sortedParticipants.contains(p))) {
-        return entry.key;
+        return entry.key; 
       }
     }
     return null;
