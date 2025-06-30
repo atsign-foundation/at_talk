@@ -138,7 +138,6 @@ Future<void> atTalk(List<String> args) async {
     ..atKeysFilePath = atsignFile
     ..atProtocolEmitted = Version(2, 0, 0);
 
-
   AtOnboardingService onboardingService = AtOnboardingServiceImpl(
       fromAtsign, atOnboardingConfig,
       atServiceFactory: atServiceFactory);
@@ -191,10 +190,10 @@ Future<void> atTalk(List<String> args) async {
         .where((s) => s.isNotEmpty)
         .toSet()
         .toList();
-    
+
     final isGroupMessage = recipients.length > 1;
     final group = recipients.toSet().toList()..sort();
-    
+
     // For multi-instance support, we need to send to ourselves too
     final allRecipients = recipients.toSet().toList()..add(fromAtsign);
 
@@ -210,14 +209,13 @@ Future<void> atTalk(List<String> args) async {
         ..sharedWith = atSign
         ..namespace = nameSpace
         ..metadata = metaData;
-      var payload =
-          jsonEncode({
-            'group': group, 
-            'from': fromAtsign, 
-            'msg': message, 
-            'instanceId': instanceId,
-            'isGroup': isGroupMessage
-          });
+      var payload = jsonEncode({
+        'group': group,
+        'from': fromAtsign,
+        'msg': message,
+        'instanceId': instanceId,
+        'isGroup': isGroupMessage
+      });
       var success = await sendNotification(
           atClient.notificationService, key, payload, logger);
       if (!success) {
@@ -299,7 +297,7 @@ Future<void> atTalk(List<String> args) async {
       // Use the isGroup flag to determine session handling
       String sessionKey;
       List<String> sessionParticipants;
-      
+
       if (isGroup) {
         // Group chat: use all participants (including myself) for consistency
         sessionParticipants = group.toSet().toList()..sort();
@@ -310,13 +308,14 @@ Future<void> atTalk(List<String> args) async {
           // This is my own message from another instance
           // The 'group' field contains the other person (the recipient)
           sessionKey = group.isNotEmpty ? group[0] : from;
-          
+
           // Special case: if sending to myself, use a self-chat session key
           if (sessionKey == fromAtsign) {
             sessionKey = fromAtsign; // Self-chat session
             sessionParticipants = [fromAtsign];
           } else {
-            sessionParticipants = [fromAtsign, sessionKey].toSet().toList()..sort();
+            sessionParticipants = [fromAtsign, sessionKey].toSet().toList()
+              ..sort();
           }
         } else {
           // This is a message from someone else
@@ -324,13 +323,15 @@ Future<void> atTalk(List<String> args) async {
           sessionParticipants = [fromAtsign, from].toSet().toList()..sort();
         }
       }
-      
+
       tui.addSession(sessionKey, sessionParticipants);
       tui.addMessage(
         sessionKey,
         msg,
         incoming: true,
-        sender: (from == fromAtsign) ? null : from, // Use null for own messages to show "me:"
+        sender: (from == fromAtsign)
+            ? null
+            : from, // Use null for own messages to show "me:"
       );
       tui.draw();
     } catch (e) {
@@ -350,25 +351,28 @@ Future<void> atTalk(List<String> args) async {
   tui.onSend = (String sessionId, String message) async {
     final session = tui.sessions[sessionId];
     if (session == null) return;
-    
+
     // Determine if this is a group chat or individual chat
     // Individual chats have exactly 2 participants (sender and receiver)
     // Group chats have 3 or more participants
     final isGroupChat = session.participants.length > 2;
-    
+
     List<String> recipients;
     List<String> groupForMessage;
-    
+
     if (isGroupChat) {
       // Group chat: send to all participants (including self for multi-instance support)
       recipients = session.participants.toSet().toList()..sort();
       groupForMessage = recipients;
     } else {
       // Individual chat: send to the other person AND to myself for multi-instance support
-      recipients = session.participants.toSet().toList()..sort(); // includes both sender and receiver
-      groupForMessage = session.participants.where((p) => p != fromAtsign).toList(); // only the other person for message group
+      recipients = session.participants.toSet().toList()
+        ..sort(); // includes both sender and receiver
+      groupForMessage = session.participants
+          .where((p) => p != fromAtsign)
+          .toList(); // only the other person for message group
     }
-    
+
     for (final atSign in recipients) {
       var metaData = Metadata()
         ..isPublic = false
@@ -380,14 +384,13 @@ Future<void> atTalk(List<String> args) async {
         ..sharedWith = atSign
         ..namespace = nameSpace
         ..metadata = metaData;
-      var payload =
-          jsonEncode({
-            'group': groupForMessage, 
-            'from': fromAtsign, 
-            'msg': message, 
-            'instanceId': instanceId,
-            'isGroup': isGroupChat
-          });
+      var payload = jsonEncode({
+        'group': groupForMessage,
+        'from': fromAtsign,
+        'msg': message,
+        'instanceId': instanceId,
+        'isGroup': isGroupChat
+      });
       var success = await sendNotification(
           atClient.notificationService, key, payload, logger);
       if (!success) {
