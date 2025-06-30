@@ -270,9 +270,11 @@ Future<void> atTalk(List<String> args) async {
     tui.addSession(groupKey, allParticipants);
     tui.switchSession(groupKey);
   } else {
-    // Single chat
-    tui.addSession(toAtsign);
-    tui.switchSession(toAtsign);
+    // Individual chat: include both participants for consistency
+    final individualParticipants = [fromAtsign, participants[0]].toSet().toList()..sort();
+    final sessionKey = participants[0]; // Use the other person's atSign as key
+    tui.addSession(sessionKey, individualParticipants);
+    tui.switchSession(sessionKey);
   }
 
   // Listen for incoming messages
@@ -303,24 +305,18 @@ Future<void> atTalk(List<String> args) async {
         sessionParticipants = group.toSet().toList()..sort();
         sessionKey = sessionParticipants.join(',');
       } else {
-        // Individual chat: determine the other person in the conversation
-        if (from == fromAtsign) {
-          // This is my own message from another instance
-          // The 'group' field contains the other person (the recipient)
-          sessionKey = group.isNotEmpty ? group[0] : from;
-
-          // Special case: if sending to myself, use a self-chat session key
-          if (sessionKey == fromAtsign) {
-            sessionKey = fromAtsign; // Self-chat session
-            sessionParticipants = [fromAtsign];
-          } else {
-            sessionParticipants = [fromAtsign, sessionKey].toSet().toList()
-              ..sort();
-          }
+        // Individual chat: use all participants for consistency
+        sessionParticipants = group.toSet().toList()..sort();
+        
+        if (sessionParticipants.length == 2 && sessionParticipants.contains(fromAtsign)) {
+          // Standard individual chat: use the other person's atSign as the key
+          sessionKey = sessionParticipants.firstWhere((p) => p != fromAtsign);
+        } else if (sessionParticipants.length == 1 && sessionParticipants[0] == fromAtsign) {
+          // Self-chat session
+          sessionKey = fromAtsign;
         } else {
-          // This is a message from someone else
-          sessionKey = from;
-          sessionParticipants = [fromAtsign, from].toSet().toList()..sort();
+          // Fallback: use the sorted participant list
+          sessionKey = sessionParticipants.join(',');
         }
       }
 
@@ -363,14 +359,11 @@ Future<void> atTalk(List<String> args) async {
     if (isGroupChat) {
       // Group chat: send to all participants (including self for multi-instance support)
       recipients = session.participants.toSet().toList()..sort();
-      groupForMessage = recipients;
+      groupForMessage = recipients; // Include all participants in the message group
     } else {
       // Individual chat: send to the other person AND to myself for multi-instance support
-      recipients = session.participants.toSet().toList()
-        ..sort(); // includes both sender and receiver
-      groupForMessage = session.participants
-          .where((p) => p != fromAtsign)
-          .toList(); // only the other person for message group
+      recipients = session.participants.toSet().toList()..sort(); // includes both sender and receiver
+      groupForMessage = session.participants.toSet().toList()..sort(); // Include all participants for consistency
     }
 
     for (final atSign in recipients) {
