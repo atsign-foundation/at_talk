@@ -123,13 +123,14 @@ Future<void> atTalk(List<String> args) async {
   }
 
   String uuid = Uuid().v4();
+  String instanceId = Uuid().v4(); // Unique ID for this app instance
   //onboarding preference builder can be used to set onboardingService parameters
   AtOnboardingPreference atOnboardingConfig = AtOnboardingPreference()
-    ..hiveStoragePath =
-        '$homeDirectory/.$nameSpace/$fromAtsign/$uuid/storage'
+    ..hiveStoragePath = '$homeDirectory/.$nameSpace/$fromAtsign/$uuid/storage'
     ..namespace = nameSpace
     ..downloadPath = '$homeDirectory/.$nameSpace/$uuid/files'
     ..isLocalStoreRequired = true
+    ..monitorHeartbeatInterval = Duration(seconds: 5)
     ..commitLogPath =
         '$homeDirectory/.$nameSpace/$fromAtsign/$uuid/storage/commitLog'
     ..rootDomain = rootDomain
@@ -137,17 +138,6 @@ Future<void> atTalk(List<String> args) async {
     ..atKeysFilePath = atsignFile
     ..atProtocolEmitted = Version(2, 0, 0);
 
-  // var metaData = Metadata()
-  //   ..isPublic = false
-  //   ..isEncrypted = true
-  //   ..namespaceAware = true;
-
-  // var key = AtKey()
-  //   ..key = 'attalk'
-  //   ..sharedBy = fromAtsign
-  //   ..sharedWith = toAtsign
-  //   ..namespace = nameSpace
-  //   ..metadata = metaData;
 
   AtOnboardingService onboardingService = AtOnboardingServiceImpl(
       fromAtsign, atOnboardingConfig,
@@ -205,7 +195,7 @@ Future<void> atTalk(List<String> args) async {
 
     bool allSuccess = true;
     for (final atSign in group) {
-      if (atSign == fromAtsign) continue;
+      // if (atSign == fromAtsign) continue;
       var metaData = Metadata()
         ..isPublic = false
         ..isEncrypted = true
@@ -217,7 +207,7 @@ Future<void> atTalk(List<String> args) async {
         ..namespace = nameSpace
         ..metadata = metaData;
       var payload =
-          jsonEncode({'group': group, 'from': fromAtsign, 'msg': message});
+          jsonEncode({'group': group, 'from': fromAtsign, 'msg': message, 'instanceId': instanceId});
       var success = await sendNotification(
           atClient.notificationService, key, payload, logger);
       if (!success) {
@@ -265,9 +255,11 @@ Future<void> atTalk(List<String> args) async {
       .toSet()
       .toList();
   if (participants.length > 1) {
-    // Group chat: use sorted group key
-    final groupKey = (participants..sort()).join(',');
-    tui.addSession(groupKey, participants);
+    // Group chat: include myself in the participants list for consistency
+    participants.add(fromAtsign);
+    final allParticipants = participants.toSet().toList()..sort();
+    final groupKey = allParticipants.join(',');
+    tui.addSession(groupKey, allParticipants);
     tui.switchSession(groupKey);
   } else {
     // Single chat
@@ -287,28 +279,38 @@ Future<void> atTalk(List<String> args) async {
       final group = (data['group'] as List).map((e) => e.toString()).toList();
       final from = data['from'] as String? ?? notification.from;
       final msg = data['msg'] as String? ?? value;
+      final messageInstanceId = data['instanceId'] as String?;
+
+      // Skip messages from this same app instance to avoid duplicates
+      if (from == fromAtsign && messageInstanceId == instanceId) return;
+
+      // For group chats, use the original group as the session key
+      // For individual chats, use the sender as the session key
+      String sessionKey;
+      List<String> sessionParticipants;
       
-      // Ignore messages from myself to avoid duplicates
-      if (from == fromAtsign) return;
+      if (group.length > 1) {
+        // Group chat: use all participants (including myself) for consistency
+        sessionParticipants = group.toSet().toList()..sort();
+        sessionKey = sessionParticipants.join(',');
+      } else {
+        // Individual chat: exclude myself from the key, but include both in participants
+        sessionParticipants = [fromAtsign, from].toSet().toList()..sort();
+        sessionKey = from;
+      }
       
-      // Exclude my own atSign from the group, but always include the creator (from)
-      final filteredGroup =
-          group.where((a) => a != fromAtsign).toSet().toList();
-      if (!filteredGroup.contains(from)) filteredGroup.add(from);
-      filteredGroup.sort();
-      final groupKey = filteredGroup.join(',');
-      tui.addSession(group.length > 1 ? groupKey : from, filteredGroup);
+      tui.addSession(sessionKey, sessionParticipants);
       tui.addMessage(
-        group.length > 1 ? groupKey : from,
+        sessionKey,
         msg,
         incoming: true,
-        sender: from,
+        sender: (from == fromAtsign) ? null : from, // Use null for own messages to show "me:"
       );
       tui.draw();
     } catch (e) {
-      // Ignore messages from myself in fallback case too
+      // Skip messages from this same app instance in fallback case too
       if (notification.from == fromAtsign) return;
-      
+
       // fallback: treat as plain message
       tui.addMessage(notification.from, notification.value ?? '',
           incoming: true);
@@ -338,7 +340,7 @@ Future<void> atTalk(List<String> args) async {
         ..namespace = nameSpace
         ..metadata = metaData;
       var payload =
-          jsonEncode({'group': group, 'from': fromAtsign, 'msg': message});
+          jsonEncode({'group': group, 'from': fromAtsign, 'msg': message, 'instanceId': instanceId});
       var success = await sendNotification(
           atClient.notificationService, key, payload, logger);
       if (!success) {
@@ -362,7 +364,8 @@ Future<bool> sendNotification(NotificationService notificationService,
   for (int retry = 0; retry < 3; retry++) {
     try {
       NotificationResult result = await notificationService.notify(
-          NotificationParams.forUpdate(key, value: input),
+          NotificationParams.forUpdate(key,
+              value: input, notificationExpiry: Duration(days: 1)),
           waitForFinalDeliveryStatus: false,
           checkForFinalDeliveryStatus: false);
       if (result.atClientException != null) {
