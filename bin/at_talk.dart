@@ -293,6 +293,7 @@ Future<void> atTalk(List<String> args) async {
       final isGroup = data['isGroup'] as bool? ?? false;
 
       // Skip messages from this same app instance to avoid duplicates
+      // But allow messages to self from different instances
       if (from == fromAtsign && messageInstanceId == instanceId) return;
 
       // Use the isGroup flag to determine session handling
@@ -309,7 +310,14 @@ Future<void> atTalk(List<String> args) async {
           // This is my own message from another instance
           // The 'group' field contains the other person (the recipient)
           sessionKey = group.isNotEmpty ? group[0] : from;
-          sessionParticipants = [fromAtsign, sessionKey].toSet().toList()..sort();
+          
+          // Special case: if sending to myself, use a self-chat session key
+          if (sessionKey == fromAtsign) {
+            sessionKey = fromAtsign; // Self-chat session
+            sessionParticipants = [fromAtsign];
+          } else {
+            sessionParticipants = [fromAtsign, sessionKey].toSet().toList()..sort();
+          }
         } else {
           // This is a message from someone else
           sessionKey = from;
