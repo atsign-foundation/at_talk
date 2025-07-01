@@ -287,11 +287,30 @@ Future<void> atTalk(List<String> args) async {
       if (value == null) return;
       final data = jsonDecode(value);
       if (data is! Map) return;
+
+      // Check if this is a group rename notification
+      if (data['type'] == 'groupRename') {
+        final group = (data['group'] as List).map((e) => e.toString()).toList();
+        final newGroupName = data['groupName'] as String?;
+        final sessionParticipants = group.toSet().toList()..sort();
+        final sessionKey = sessionParticipants.join(',');
+
+        // Update the group name
+        tui.addSession(sessionKey, sessionParticipants, newGroupName);
+        final displayName =
+            newGroupName?.isNotEmpty == true ? newGroupName! : 'Unnamed Group';
+        tui.addMessage(sessionKey, '[Group renamed to "$displayName"]',
+            incoming: true);
+        tui.draw();
+        return;
+      }
+
       final group = (data['group'] as List).map((e) => e.toString()).toList();
       final from = data['from'] as String? ?? notification.from;
       final msg = data['msg'] as String? ?? value;
       final messageInstanceId = data['instanceId'] as String?;
       final isGroup = data['isGroup'] as bool? ?? false;
+      final groupName = data['groupName'] as String?;
 
       // Skip messages from this same app instance to avoid duplicates
       // But allow messages to self from different instances
@@ -323,7 +342,7 @@ Future<void> atTalk(List<String> args) async {
         }
       }
 
-      tui.addSession(sessionKey, sessionParticipants);
+      tui.addSession(sessionKey, sessionParticipants, groupName);
       tui.addMessage(
         sessionKey,
         msg,
@@ -388,7 +407,8 @@ Future<void> atTalk(List<String> args) async {
         'from': fromAtsign,
         'msg': message,
         'instanceId': instanceId,
-        'isGroup': isGroupChat
+        'isGroup': isGroupChat,
+        'groupName': session.groupName
       });
       var success = await sendNotification(
           atClient.notificationService, key, payload, logger);
@@ -397,6 +417,34 @@ Future<void> atTalk(List<String> args) async {
             incoming: true);
         tui.draw();
       }
+    }
+  };
+
+  // Group rename handler
+  tui.onGroupRename = (String sessionId, String newGroupName) async {
+    final session = tui.sessions[sessionId];
+    if (session == null) return;
+
+    for (final atSign in session.participants) {
+      var metaData = Metadata()
+        ..isPublic = false
+        ..isEncrypted = true
+        ..namespaceAware = true;
+      var key = AtKey()
+        ..key = 'attalk'
+        ..sharedBy = fromAtsign
+        ..sharedWith = atSign
+        ..namespace = nameSpace
+        ..metadata = metaData;
+      var payload = jsonEncode({
+        'type': 'groupRename',
+        'group': session.participants,
+        'from': fromAtsign,
+        'groupName': newGroupName,
+        'instanceId': instanceId,
+      });
+      await sendNotification(
+          atClient.notificationService, key, payload, logger);
     }
   };
 
@@ -414,8 +462,7 @@ Future<bool> sendNotification(NotificationService notificationService,
     try {
       NotificationResult result = await notificationService.notify(
           NotificationParams.forUpdate(key,
-              value: input, notificationExpiry: Duration(days: 1)
-              ),
+              value: input, notificationExpiry: Duration(days: 1)),
           waitForFinalDeliveryStatus: false,
           checkForFinalDeliveryStatus: false);
       if (result.atClientException != null) {

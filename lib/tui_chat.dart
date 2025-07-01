@@ -5,17 +5,36 @@ import 'dart:async';
 class ChatSession {
   final String id;
   final List<String> participants;
+  String? groupName; // New field for group names
   final List<String> messages = [];
   int scrollOffset = 0;
   int unreadCount = 0;
-  ChatSession(this.id, this.participants);
+  ChatSession(this.id, this.participants, {this.groupName});
+
+  // Get display name for the session
+  String getDisplayName(String myAtSign) {
+    if (groupName != null && groupName!.isNotEmpty) {
+      return groupName!;
+    }
+
+    // For individual chats (2 participants including me), show only the other person
+    if (participants.length == 2 && participants.contains(myAtSign)) {
+      return participants.firstWhere((p) => p != myAtSign);
+    }
+
+    // For group chats or other cases, show all participants except me
+    var others = participants.where((p) => p != myAtSign).toList();
+    return others.isEmpty ? participants.join(', ') : others.join(', ');
+  }
 }
 
 class TuiChatApp {
   final String myAtSign;
   final Map<String, ChatSession> sessions = {};
   String? activeSession;
-  void Function(String atSign, String message)? onSend;
+  void Function(String sessionId, String message)? onSend;
+  void Function(String sessionId, String newGroupName)?
+      onGroupRename; // New callback for group renames
   int windowOffset = 0;
   int windowSize = 1;
   List<String> get sessionList => sessions.keys.toList();
@@ -25,15 +44,26 @@ class TuiChatApp {
   bool redrawRequested = false;
   bool showHelpHint = true;
 
+  // State for group name input
+  bool _waitingForGroupName = false;
+  List<String>? _pendingParticipants;
+  String? _pendingSessionKey;
+
   TuiChatApp(this.myAtSign);
 
-  void addSession(String id, [List<String>? participants]) {
+  void addSession(String id, [List<String>? participants, String? groupName]) {
     if (!sessions.containsKey(id)) {
-      sessions[id] = ChatSession(id, participants ?? [id]);
-    } else if (participants != null) {
-      sessions[id]!.participants
-        ..clear()
-        ..addAll(participants);
+      sessions[id] =
+          ChatSession(id, participants ?? [id], groupName: groupName);
+    } else {
+      if (participants != null) {
+        sessions[id]!.participants
+          ..clear()
+          ..addAll(participants);
+      }
+      if (groupName != null) {
+        sessions[id]!.groupName = groupName;
+      }
     }
     activeSession ??= id;
   }
@@ -55,7 +85,7 @@ class TuiChatApp {
         ..sort();
       if (sessionParticipants.length == sortedParticipants.length &&
           sessionParticipants.every((p) => sortedParticipants.contains(p))) {
-        return entry.key; 
+        return entry.key;
       }
     }
     return null;
@@ -320,7 +350,9 @@ class TuiChatApp {
         sessionLine = unreadStr +
             marker +
             ' ' +
-            s.padRight(sessionWidth - 6 - marker.length);
+            sessions[s]!
+                .getDisplayName(myAtSign)
+                .padRight(sessionWidth - 6 - marker.length);
       } else {
         sessionLine = ' '.padRight(sessionWidth);
       }
@@ -362,8 +394,9 @@ class TuiChatApp {
       'Text Commands:',
       '  /switch @other   Switch to chat with @other',
       '  /new @other      Start new chat with @other',
-      '  /add @other      Add participant to chat',
-      '  /remove @other   Remove participant from chat',
+      '  /add @other      Add participant to group',
+      '  /remove @other   Remove participant from group',
+      '  /rename name     Rename current group',
       '  /delete          Delete current session',
       '  /list            Show participants list',
       '  /exit            Quit',
@@ -473,8 +506,11 @@ class TuiChatApp {
       } else if (i == panelHeight - 1) {
         stdout.write(chalk.yellow('└' + '─' * (panelWidth - 2) + '┘'));
       } else if (i == 1) {
-        // Title with scroll indicators
-        String title = chalk.bold(' Participants (${participants.length})');
+        // Title with group name and scroll indicators
+        final session = sessions[activeSession!]!;
+        String title = session.groupName != null
+            ? chalk.bold(' Group: ${session.groupName}')
+            : chalk.bold(' Participants (${participants.length})');
         String scrollInfo = '';
         if (participants.length > visibleCount) {
           String upIndicator = scroll > 0 ? '↑' : ' ';
@@ -482,9 +518,11 @@ class TuiChatApp {
               scroll < participants.length - visibleCount ? '↓' : ' ';
           scrollInfo = ' $upIndicator$downIndicator ';
         }
-        int titleVisibleLen =
-            stripAnsi(' Participants (${participants.length})').length +
-                scrollInfo.length;
+        int titleVisibleLen = stripAnsi(session.groupName != null
+                    ? ' Group: ${session.groupName}'
+                    : ' Participants (${participants.length})')
+                .length +
+            scrollInfo.length;
         String titleLine =
             title + scrollInfo + ' ' * (panelWidth - 2 - titleVisibleLen);
         stdout.write(chalk.yellow('│') + titleLine + chalk.yellow('│'));
@@ -685,6 +723,38 @@ class TuiChatApp {
           final termHeight = stdout.hasTerminal ? stdout.terminalLines : 24;
           stdout.write('\x1b[${termHeight};1H\x1b[K> ');
 
+          // Check if we're waiting for a group name
+          if (_waitingForGroupName &&
+              _pendingParticipants != null &&
+              _pendingSessionKey != null) {
+            _waitingForGroupName = false;
+            var groupName = input.isNotEmpty ? input : null;
+            var newSessionKey = _pendingSessionKey!;
+
+            // Update the existing session with the group name
+            sessions[newSessionKey]!.groupName = groupName;
+
+            // Clear the prompt message (it was the last one added)
+            if (sessions[newSessionKey]!.messages.isNotEmpty &&
+                sessions[newSessionKey]!
+                    .messages
+                    .last
+                    .contains('[Enter a name for this group')) {
+              sessions[newSessionKey]!.messages.removeLast();
+            }
+
+            var displayName =
+                groupName?.isNotEmpty == true ? groupName! : 'Unnamed Group';
+            addMessage(newSessionKey, '[Group "$displayName" created]',
+                incoming: true);
+
+            // Clear pending state
+            _pendingParticipants = null;
+            _pendingSessionKey = null;
+            requestRedraw();
+            continue;
+          }
+
           if (input == '/?') {
             showHelpPanel();
             continue;
@@ -715,11 +785,44 @@ class TuiChatApp {
               ids.add(myAtSign);
               var allParticipants = ids.toSet().toList()..sort();
               var groupKey = allParticipants.join(',');
+
+              // Create and switch to the new group session immediately
               addSession(groupKey, allParticipants);
               switchSession(groupKey);
+
+              // Clear the chat window by starting fresh
+              sessions[groupKey]!.messages.clear();
+
+              // Set up for group name prompting
+              _waitingForGroupName = true;
+              _pendingParticipants = allParticipants;
+              _pendingSessionKey = groupKey;
+
+              // Add the prompt message to the clean session
+              addMessage(groupKey,
+                  '[Enter a name for this group (or press Enter for no name):]',
+                  incoming: true);
+              requestRedraw();
             }
           } else if (input == '/delete') {
             if (activeSession != null) deleteSession(activeSession!);
+          } else if (input.startsWith('/rename ')) {
+            var newName = input.substring(8).trim();
+            if (activeSession != null) {
+              var session = sessions[activeSession!]!;
+              session.groupName = newName.isNotEmpty ? newName : null;
+
+              var displayName = session.groupName ?? 'Unnamed Group';
+              addMessage(activeSession!, '[Group renamed to "$displayName"]',
+                  incoming: true);
+
+              // Notify other participants of the rename
+              if (onGroupRename != null) {
+                onGroupRename!(activeSession!, newName);
+              }
+
+              requestRedraw();
+            }
           } else if (input.startsWith('/add ')) {
             var newParticipant = input.substring(5).trim();
             if (activeSession != null && newParticipant.isNotEmpty) {
@@ -740,26 +843,57 @@ class TuiChatApp {
                       '[Switched to existing conversation with these participants]',
                       incoming: true);
                 } else {
-                  // Create new session with the new participant set
-                  var newSessionKey = generateSessionKey(newParticipants);
+                  // For group chats (3+ participants), prompt for group name
+                  if (newParticipants.length >= 3) {
+                    var newSessionKey = generateSessionKey(newParticipants);
 
-                  // Copy messages and state from current session to new session
-                  addSession(newSessionKey, newParticipants);
-                  sessions[newSessionKey]!.messages.addAll(session.messages);
-                  sessions[newSessionKey]!.scrollOffset = session.scrollOffset;
+                    // Copy messages and state from current session to new session
+                    addSession(newSessionKey, newParticipants);
+                    sessions[newSessionKey]!.messages.addAll(session.messages);
+                    sessions[newSessionKey]!.scrollOffset =
+                        session.scrollOffset;
 
-                  // Remove old session if it's different from the new one
-                  if (newSessionKey != activeSession!) {
-                    sessions.remove(activeSession!);
+                    // Remove old session if it's different from the new one
+                    if (newSessionKey != activeSession!) {
+                      sessions.remove(activeSession!);
+                    }
+
+                    // Switch to new session
+                    activeSession = newSessionKey;
+                    windowOffset = sessionList.indexOf(newSessionKey);
+
+                    // Set up for group name prompting
+                    _waitingForGroupName = true;
+                    _pendingParticipants = newParticipants;
+                    _pendingSessionKey = newSessionKey;
+
+                    addMessage(newSessionKey,
+                        '[Enter a name for this group (or press Enter to keep current name):]',
+                        incoming: true);
+                    requestRedraw();
+                  } else {
+                    // Individual chat - no group name needed
+                    var newSessionKey = generateSessionKey(newParticipants);
+
+                    // Copy messages and state from current session to new session
+                    addSession(newSessionKey, newParticipants);
+                    sessions[newSessionKey]!.messages.addAll(session.messages);
+                    sessions[newSessionKey]!.scrollOffset =
+                        session.scrollOffset;
+
+                    // Remove old session if it's different from the new one
+                    if (newSessionKey != activeSession!) {
+                      sessions.remove(activeSession!);
+                    }
+
+                    // Switch to new session
+                    activeSession = newSessionKey;
+                    windowOffset = sessionList.indexOf(newSessionKey);
+                    addMessage(
+                        newSessionKey, '[Added $newParticipant to the chat]',
+                        incoming: true);
+                    requestRedraw();
                   }
-
-                  // Switch to new session
-                  activeSession = newSessionKey;
-                  windowOffset = sessionList.indexOf(newSessionKey);
-                  addMessage(
-                      newSessionKey, '[Added $newParticipant to the chat]',
-                      incoming: true);
-                  requestRedraw();
                 }
               } else {
                 addMessage(activeSession!,
