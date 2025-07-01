@@ -398,7 +398,7 @@ class TuiChatApp {
       '  /remove @other   Remove participant from group',
       '  /rename name     Rename current group',
       '  /delete          Delete current session',
-      '  /list            Show participants list',
+      '  /list            Show group info panel',
       '  /exit            Quit',
       '',
       'Press Escape to close this help panel.'
@@ -445,54 +445,176 @@ class TuiChatApp {
     final session = sessions[activeSession!]!;
     final termWidth = stdout.hasTerminal ? stdout.terminalColumns : 80;
     final termHeight = stdout.hasTerminal ? stdout.terminalLines : 24;
-    final panelWidth = 40;
+    final panelWidth = 50; // Increased width for better layout
     final maxPanelHeight = termHeight - 8;
-    final participants = [
-      myAtSign,
-      ...session.participants.where((p) => p != myAtSign)
-    ];
-    int scroll = 0;
 
-    // Calculate visible count
-    int visibleCount = (participants.length < maxPanelHeight - 4)
-        ? participants.length
-        : (maxPanelHeight - 4);
+    int scroll = 0;
+    String inputBuffer = '';
+    bool isInputMode = false;
+    String inputPrompt = '';
+    int inputAction = 0; // 1: rename, 2: add, 3: remove
 
     stdin.echoMode = false;
     stdin.lineMode = false;
 
-    // Manual scroll mode only
     while (true) {
-      // Draw the panel
-      _drawParticipantsPanel(participants, scroll, visibleCount, panelWidth,
-          termWidth, termHeight, false);
+      final participants = [
+        myAtSign,
+        ...session.participants.where((p) => p != myAtSign)
+      ];
+
+      // Calculate visible count for participants
+      int visibleCount = (participants.length < maxPanelHeight - 8)
+          ? participants.length
+          : (maxPanelHeight - 8);
+
+      // Draw the enhanced panel
+      _drawEnhancedParticipantsPanel(
+          participants,
+          scroll,
+          visibleCount,
+          panelWidth,
+          termWidth,
+          termHeight,
+          isInputMode,
+          inputBuffer,
+          inputPrompt,
+          session);
 
       // Wait for input
       int key = stdin.readByteSync();
-      if (key == 27) {
-        // Escape key
-        break;
-      } else if (key == 106 && scroll < participants.length - visibleCount) {
-        // 'j'
-        scroll++;
-      } else if (key == 107 && scroll > 0) {
-        // 'k'
-        scroll--;
+
+      if (isInputMode) {
+        // Handle input mode
+        if (key == 27) {
+          // Escape - cancel input
+          isInputMode = false;
+          inputBuffer = '';
+          inputAction = 0;
+        } else if (key == 13 || key == 10) {
+          // Enter - submit input
+          if (inputBuffer.trim().isNotEmpty) {
+            if (inputAction == 1) {
+              // Rename
+              session.groupName = inputBuffer.trim();
+              var displayName = session.groupName ?? 'Unnamed Group';
+              addMessage(activeSession!, '[Group renamed to "$displayName"]',
+                  incoming: true);
+              if (onGroupRename != null) {
+                onGroupRename!(activeSession!, inputBuffer.trim());
+              }
+            } else if (inputAction == 2) {
+              // Add participant
+              var newParticipant = inputBuffer.trim();
+              if (!session.participants.contains(newParticipant) &&
+                  newParticipant != myAtSign) {
+                // Check if this will create a group (3+ participants)
+                if (session.participants.length == 2) {
+                  // Converting from individual chat to group - use same logic as command
+                  var newParticipants = session.participants.toList()
+                    ..add(newParticipant);
+
+                  // Set up for group name prompting and session transition
+                  _waitingForGroupName = true;
+                  _pendingParticipants = newParticipants;
+                  _pendingSessionKey = activeSession!;
+
+                  addMessage(
+                      activeSession!, '[Added $newParticipant to the chat]',
+                      incoming: true);
+                  addMessage(activeSession!,
+                      '[Enter a name for this group (or press Enter for no name):]',
+                      incoming: true);
+                  requestRedraw();
+                  break; // Exit panel to handle group naming
+                } else {
+                  // Already a group - just add participant
+                  session.participants.add(newParticipant);
+                  addMessage(
+                      activeSession!, '[Added $newParticipant to the chat]',
+                      incoming: true);
+                }
+              }
+            } else if (inputAction == 3) {
+              // Remove participant
+              var participantToRemove = inputBuffer.trim();
+              if (session.participants.contains(participantToRemove) &&
+                  participantToRemove != myAtSign) {
+                // Simply remove from the current session, preserving group name and messages
+                session.participants.remove(participantToRemove);
+                addMessage(activeSession!,
+                    '[Removed $participantToRemove from the chat]',
+                    incoming: true);
+              }
+            }
+          }
+          isInputMode = false;
+          inputBuffer = '';
+          inputAction = 0;
+          requestRedraw();
+        } else if (key == 127 || key == 8) {
+          // Backspace
+          if (inputBuffer.isNotEmpty) {
+            inputBuffer = inputBuffer.substring(0, inputBuffer.length - 1);
+          }
+        } else if (key >= 32 && key <= 126) {
+          // Printable characters
+          inputBuffer += String.fromCharCode(key);
+        }
+      } else {
+        // Handle navigation mode
+        if (key == 27) {
+          // Escape key
+          break;
+        } else if (key == 106 && scroll < participants.length - visibleCount) {
+          // 'j' - scroll down
+          scroll++;
+        } else if (key == 107 && scroll > 0) {
+          // 'k' - scroll up
+          scroll--;
+        } else if (key == 114) {
+          // 'r' - rename group
+          if (session.participants.length >= 3) {
+            // Only for groups
+            inputAction = 1;
+            isInputMode = true;
+            inputBuffer = session.groupName ?? '';
+            inputPrompt = 'Enter new group name:';
+          }
+        } else if (key == 97) {
+          // 'a' - add participant
+          inputAction = 2;
+          isInputMode = true;
+          inputBuffer = '';
+          inputPrompt = 'Enter atSign to add:';
+        } else if (key == 100) {
+          // 'd' - remove participant (delete)
+          if (session.participants.length > 2) {
+            // Don't allow removing from 1-on-1 chats
+            inputAction = 3;
+            isInputMode = true;
+            inputBuffer = '';
+            inputPrompt = 'Enter atSign to remove:';
+          }
+        }
       }
     }
 
     draw();
   }
 
-  void _drawParticipantsPanel(
+  void _drawEnhancedParticipantsPanel(
       List<String> participants,
       int scroll,
       int visibleCount,
       int panelWidth,
       int termWidth,
       int termHeight,
-      bool needsAutoScroll) {
-    int panelHeight = visibleCount + 4;
+      bool isInputMode,
+      String inputBuffer,
+      String inputPrompt,
+      ChatSession session) {
+    int panelHeight = visibleCount + 8; // Increased for buttons
     int left = ((termWidth - panelWidth) ~/ 2).clamp(0, termWidth - 1);
     int top = ((termHeight - panelHeight) ~/ 2).clamp(0, termHeight - 1);
 
@@ -501,13 +623,12 @@ class TuiChatApp {
       stdout.write('\x1b[${top + i + 1};${left + 1}H');
       if (i == 0) {
         stdout.write(chalk.yellow('┌' + '─' * (panelWidth - 2) + '┐'));
-      } else if (i == 2) {
+      } else if (i == 2 || i == panelHeight - 5) {
         stdout.write(chalk.yellow('├' + '─' * (panelWidth - 2) + '┤'));
       } else if (i == panelHeight - 1) {
         stdout.write(chalk.yellow('└' + '─' * (panelWidth - 2) + '┘'));
       } else if (i == 1) {
         // Title with group name and scroll indicators
-        final session = sessions[activeSession!]!;
         String title = session.groupName != null
             ? chalk.bold(' Group: ${session.groupName}')
             : chalk.bold(' Participants (${participants.length})');
@@ -526,7 +647,8 @@ class TuiChatApp {
         String titleLine =
             title + scrollInfo + ' ' * (panelWidth - 2 - titleVisibleLen);
         stdout.write(chalk.yellow('│') + titleLine + chalk.yellow('│'));
-      } else {
+      } else if (i >= 3 && i < 3 + visibleCount) {
+        // Participant list
         int participantIndex = i - 3 + scroll;
         if (participantIndex < participants.length) {
           String p = participants[participantIndex];
@@ -538,17 +660,52 @@ class TuiChatApp {
         } else {
           stdout.write(chalk.yellow('│' + ' ' * (panelWidth - 2) + '│'));
         }
+      } else if (i == panelHeight - 4) {
+        // Rename button (only for groups)
+        String renameText = session.participants.length >= 3
+            ? chalk.cyan(' [r] Rename Group')
+            : chalk.gray(' [r] Rename Group (groups only)');
+        String line =
+            renameText + ' ' * (panelWidth - 2 - stripAnsi(renameText).length);
+        stdout.write(chalk.yellow('│') + line + chalk.yellow('│'));
+      } else if (i == panelHeight - 3) {
+        // Add participant button
+        String addText = chalk.green(' [a] Add Participant');
+        String line =
+            addText + ' ' * (panelWidth - 2 - stripAnsi(addText).length);
+        stdout.write(chalk.yellow('│') + line + chalk.yellow('│'));
+      } else if (i == panelHeight - 2) {
+        // Remove participant button (only if more than 2 participants)
+        String removeText = session.participants.length > 2
+            ? chalk.red(' [d] Remove Participant')
+            : chalk.gray(' [d] Remove Participant (groups only)');
+        String line =
+            removeText + ' ' * (panelWidth - 2 - stripAnsi(removeText).length);
+        stdout.write(chalk.yellow('│') + line + chalk.yellow('│'));
+      } else {
+        stdout.write(chalk.yellow('│' + ' ' * (panelWidth - 2) + '│'));
       }
     }
 
-    // Show instructions below panel
+    // Show input prompt or instructions below panel
     stdout.write('\x1b[${top + panelHeight + 1};${left + 1}H');
-    if (participants.length > visibleCount) {
+    if (isInputMode) {
+      String promptLine = chalk.bold(inputPrompt + ' ') + inputBuffer;
+      stdout.write(promptLine.padRight(panelWidth));
+      stdout.write('\x1b[${top + panelHeight + 2};${left + 1}H');
       stdout.write(chalk
-          .bold('Use j/k to scroll, [Esc] to close.')
+          .dim('[Enter] to confirm, [Esc] to cancel')
           .padRight(panelWidth));
     } else {
-      stdout.write(chalk.bold('Press [Esc] to close.').padRight(panelWidth));
+      if (participants.length > visibleCount) {
+        stdout.write(chalk
+            .bold('Use j/k to scroll, [Esc] to close.')
+            .padRight(panelWidth));
+      } else {
+        stdout.write(chalk
+            .bold('Use action keys or [Esc] to close.')
+            .padRight(panelWidth));
+      }
     }
   }
 
@@ -729,23 +886,45 @@ class TuiChatApp {
               _pendingSessionKey != null) {
             _waitingForGroupName = false;
             var groupName = input.isNotEmpty ? input : null;
-            var newSessionKey = _pendingSessionKey!;
+            var oldSessionKey = _pendingSessionKey!;
+            var oldSession = sessions[oldSessionKey]!;
 
-            // Update the existing session with the group name
-            sessions[newSessionKey]!.groupName = groupName;
+            // Generate new session key for the group
+            var newSessionKey = generateSessionKey(_pendingParticipants!);
+
+            // If the session key changes (individual to group), migrate the session
+            if (newSessionKey != oldSessionKey) {
+              // Create new session with group participants and name
+              addSession(newSessionKey, _pendingParticipants!, groupName);
+
+              // Transfer all messages from old session to new session
+              sessions[newSessionKey]!.messages.addAll(oldSession.messages);
+
+              // Remove old session
+              sessions.remove(oldSessionKey);
+
+              // Switch to new session
+              activeSession = newSessionKey;
+              windowOffset = sessionList.indexOf(newSessionKey);
+            } else {
+              // Same session key, just update participants and group name
+              oldSession.participants.clear();
+              oldSession.participants.addAll(_pendingParticipants!);
+              oldSession.groupName = groupName;
+            }
 
             // Clear the prompt message (it was the last one added)
-            if (sessions[newSessionKey]!.messages.isNotEmpty &&
-                sessions[newSessionKey]!
+            if (sessions[activeSession!]!.messages.isNotEmpty &&
+                sessions[activeSession!]!
                     .messages
                     .last
                     .contains('[Enter a name for this group')) {
-              sessions[newSessionKey]!.messages.removeLast();
+              sessions[activeSession!]!.messages.removeLast();
             }
 
             var displayName =
                 groupName?.isNotEmpty == true ? groupName! : 'Unnamed Group';
-            addMessage(newSessionKey, '[Group "$displayName" created]',
+            addMessage(activeSession!, '[Group "$displayName" created]',
                 incoming: true);
 
             // Clear pending state
@@ -828,72 +1007,31 @@ class TuiChatApp {
             if (activeSession != null && newParticipant.isNotEmpty) {
               var session = sessions[activeSession!]!;
               if (!session.participants.contains(newParticipant)) {
-                // Create new participant list with the added participant
-                var newParticipants = session.participants.toList()
-                  ..add(newParticipant);
+                // Check if this will create a group (3+ participants)
+                if (session.participants.length == 2) {
+                  // Converting from individual chat to group
+                  var newParticipants = session.participants.toList()
+                    ..add(newParticipant);
 
-                // Check if a session with this participant set already exists
-                var existingSessionKey =
-                    findSessionWithParticipants(newParticipants);
+                  // Set up for group name prompting and session transition
+                  _waitingForGroupName = true;
+                  _pendingParticipants = newParticipants;
+                  _pendingSessionKey =
+                      activeSession!; // Store current session for migration
 
-                if (existingSessionKey != null) {
-                  // Switch to existing session
-                  switchSession(existingSessionKey);
-                  addMessage(existingSessionKey,
-                      '[Switched to existing conversation with these participants]',
+                  addMessage(
+                      activeSession!, '[Added $newParticipant to the chat]',
                       incoming: true);
+                  addMessage(activeSession!,
+                      '[Enter a name for this group (or press Enter for no name):]',
+                      incoming: true);
+                  requestRedraw();
                 } else {
-                  // For group chats (3+ participants), prompt for group name
-                  if (newParticipants.length >= 3) {
-                    var newSessionKey = generateSessionKey(newParticipants);
-
-                    // Copy messages and state from current session to new session
-                    addSession(newSessionKey, newParticipants);
-                    sessions[newSessionKey]!.messages.addAll(session.messages);
-                    sessions[newSessionKey]!.scrollOffset =
-                        session.scrollOffset;
-
-                    // Remove old session if it's different from the new one
-                    if (newSessionKey != activeSession!) {
-                      sessions.remove(activeSession!);
-                    }
-
-                    // Switch to new session
-                    activeSession = newSessionKey;
-                    windowOffset = sessionList.indexOf(newSessionKey);
-
-                    // Set up for group name prompting
-                    _waitingForGroupName = true;
-                    _pendingParticipants = newParticipants;
-                    _pendingSessionKey = newSessionKey;
-
-                    addMessage(newSessionKey,
-                        '[Enter a name for this group (or press Enter to keep current name):]',
-                        incoming: true);
-                    requestRedraw();
-                  } else {
-                    // Individual chat - no group name needed
-                    var newSessionKey = generateSessionKey(newParticipants);
-
-                    // Copy messages and state from current session to new session
-                    addSession(newSessionKey, newParticipants);
-                    sessions[newSessionKey]!.messages.addAll(session.messages);
-                    sessions[newSessionKey]!.scrollOffset =
-                        session.scrollOffset;
-
-                    // Remove old session if it's different from the new one
-                    if (newSessionKey != activeSession!) {
-                      sessions.remove(activeSession!);
-                    }
-
-                    // Switch to new session
-                    activeSession = newSessionKey;
-                    windowOffset = sessionList.indexOf(newSessionKey);
-                    addMessage(
-                        newSessionKey, '[Added $newParticipant to the chat]',
-                        incoming: true);
-                    requestRedraw();
-                  }
+                  // Already a group - just add participant
+                  session.participants.add(newParticipant);
+                  addMessage(
+                      activeSession!, '[Added $newParticipant to the chat]',
+                      incoming: true);
                 }
               } else {
                 addMessage(activeSession!,
@@ -908,44 +1046,11 @@ class TuiChatApp {
               if (session.participants.contains(participantToRemove)) {
                 // Don't allow removing yourself from the chat
                 if (participantToRemove != myAtSign) {
-                  // Create new participant list without the removed participant
-                  var newParticipants = session.participants
-                      .where((p) => p != participantToRemove)
-                      .toList();
-
-                  // Check if a session with this participant set already exists
-                  var existingSessionKey =
-                      findSessionWithParticipants(newParticipants);
-
-                  if (existingSessionKey != null) {
-                    // Switch to existing session
-                    switchSession(existingSessionKey);
-                    addMessage(existingSessionKey,
-                        '[Switched to existing conversation with these participants]',
-                        incoming: true);
-                  } else {
-                    // Create new session with the remaining participants
-                    var newSessionKey = generateSessionKey(newParticipants);
-
-                    // Copy messages and state from current session to new session
-                    addSession(newSessionKey, newParticipants);
-                    sessions[newSessionKey]!.messages.addAll(session.messages);
-                    sessions[newSessionKey]!.scrollOffset =
-                        session.scrollOffset;
-
-                    // Remove old session if it's different from the new one
-                    if (newSessionKey != activeSession!) {
-                      sessions.remove(activeSession!);
-                    }
-
-                    // Switch to new session
-                    activeSession = newSessionKey;
-                    windowOffset = sessionList.indexOf(newSessionKey);
-                    addMessage(newSessionKey,
-                        '[Removed $participantToRemove from the chat]',
-                        incoming: true);
-                    requestRedraw();
-                  }
+                  // Simply remove from the current session, preserving group name and messages
+                  session.participants.remove(participantToRemove);
+                  addMessage(activeSession!,
+                      '[Removed $participantToRemove from the chat]',
+                      incoming: true);
                 } else {
                   // Show error message - can't remove yourself
                   addMessage(

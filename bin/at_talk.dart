@@ -342,6 +342,14 @@ Future<void> atTalk(List<String> args) async {
         }
       }
 
+      // Try to find existing session with same participants first
+      // This helps avoid duplicate sessions when group membership changes
+      String? existingSessionKey =
+          tui.findSessionWithParticipants(sessionParticipants);
+      if (existingSessionKey != null) {
+        sessionKey = existingSessionKey;
+      }
+
       tui.addSession(sessionKey, sessionParticipants, groupName);
       tui.addMessage(
         sessionKey,
