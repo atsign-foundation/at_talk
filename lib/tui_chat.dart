@@ -35,6 +35,8 @@ class TuiChatApp {
   void Function(String sessionId, String message)? onSend;
   void Function(String sessionId, String newGroupName)?
       onGroupRename; // New callback for group renames
+  void Function(String sessionId, List<String> participants, String? groupName)?
+      onGroupMembershipChange; // New callback for group membership changes
   int windowOffset = 0;
   int windowSize = 1;
   List<String> get sessionList => sessions.keys.toList();
@@ -510,14 +512,29 @@ class TuiChatApp {
                   newParticipant != myAtSign) {
                 // Check if this will create a group (3+ participants)
                 if (session.participants.length == 2) {
-                  // Converting from individual chat to group - use same logic as command
+                  // Converting from individual chat to group - create NEW group session
+                  // instead of migrating the existing 2-person chat
                   var newParticipants = session.participants.toList()
                     ..add(newParticipant);
 
-                  // Set up for group name prompting and session transition
+                  // Create a unique session key for the new group to avoid conflicts
+                  var sortedParticipants = newParticipants.toSet().toList()
+                    ..sort();
+                  var timestamp = DateTime.now().millisecondsSinceEpoch;
+                  var groupKey = '${sortedParticipants.join(',')}#$timestamp';
+
+                  // Create the new group session directly
+                  sessions[groupKey] = ChatSession(groupKey, newParticipants);
+
+                  // Switch to the new group session
+                  activeSession = groupKey;
+                  windowOffset = sessionList.indexOf(groupKey);
+
+                  // Set up for group name prompting for the NEW session
                   _waitingForGroupName = true;
                   _pendingParticipants = newParticipants;
-                  _pendingSessionKey = activeSession!;
+                  _pendingSessionKey =
+                      groupKey; // Use the new group session key
 
                   addMessage(
                       activeSession!, '[Added $newParticipant to the chat]',
@@ -528,11 +545,40 @@ class TuiChatApp {
                   requestRedraw();
                   break; // Exit panel to handle group naming
                 } else {
-                  // Already a group - just add participant
+                  // Already a group - add participant and update session key if needed
                   session.participants.add(newParticipant);
+
+                  // Check if session key needs to be updated
+                  var newSessionKey = generateSessionKey(session.participants);
+                  var currentSessionKey = activeSession!;
+
+                  if (newSessionKey != currentSessionKey) {
+                    // Need to migrate to new session key
+                    var groupName = session.groupName;
+                    var messages = session.messages.toList();
+
+                    // Create new session with updated participants
+                    addSession(newSessionKey, session.participants.toList(),
+                        groupName);
+                    sessions[newSessionKey]!.messages.addAll(messages);
+
+                    // Remove old session
+                    sessions.remove(currentSessionKey);
+
+                    // Switch to new session
+                    activeSession = newSessionKey;
+                    windowOffset = sessionList.indexOf(newSessionKey);
+                  }
+
                   addMessage(
                       activeSession!, '[Added $newParticipant to the chat]',
                       incoming: true);
+
+                  // Notify other participants of the membership change
+                  if (onGroupMembershipChange != null) {
+                    onGroupMembershipChange!(activeSession!,
+                        session.participants.toList(), session.groupName);
+                  }
                 }
               }
             } else if (inputAction == 3) {
@@ -545,6 +591,12 @@ class TuiChatApp {
                 addMessage(activeSession!,
                     '[Removed $participantToRemove from the chat]',
                     incoming: true);
+
+                // Notify other participants of the membership change
+                if (onGroupMembershipChange != null) {
+                  onGroupMembershipChange!(activeSession!,
+                      session.participants.toList(), session.groupName);
+                }
               }
             }
           }
@@ -927,6 +979,16 @@ class TuiChatApp {
             addMessage(activeSession!, '[Group "$displayName" created]',
                 incoming: true);
 
+            // Notify other participants of the new group membership
+            if (onGroupMembershipChange != null) {
+              var session = sessions[activeSession!]!;
+              // Use a small delay to ensure the session migration is complete
+              Future.delayed(Duration(milliseconds: 100), () {
+                onGroupMembershipChange!(activeSession!,
+                    session.participants.toList(), session.groupName);
+              });
+            }
+
             // Clear pending state
             _pendingParticipants = null;
             _pendingSessionKey = null;
@@ -963,14 +1025,15 @@ class TuiChatApp {
               // Group chat: include myself in the participants list for consistency
               ids.add(myAtSign);
               var allParticipants = ids.toSet().toList()..sort();
-              var groupKey = allParticipants.join(',');
+
+              // For /new command, always create a unique session key to avoid reusing existing groups
+              var timestamp = DateTime.now().millisecondsSinceEpoch;
+              var groupKey = '${allParticipants.join(',')}#$timestamp';
 
               // Create and switch to the new group session immediately
-              addSession(groupKey, allParticipants);
-              switchSession(groupKey);
-
-              // Clear the chat window by starting fresh
-              sessions[groupKey]!.messages.clear();
+              // Use direct session creation to ensure a fresh session
+              sessions[groupKey] = ChatSession(groupKey, allParticipants);
+              activeSession = groupKey;
 
               // Set up for group name prompting
               _waitingForGroupName = true;
@@ -1010,14 +1073,28 @@ class TuiChatApp {
                 // Check if this will create a group (3+ participants)
                 if (session.participants.length == 2) {
                   // Converting from individual chat to group
+                  // Create a NEW group session instead of migrating the existing 2-person chat
                   var newParticipants = session.participants.toList()
                     ..add(newParticipant);
 
-                  // Set up for group name prompting and session transition
+                  // Create a unique session key for the new group to avoid conflicts
+                  var sortedParticipants = newParticipants.toSet().toList()
+                    ..sort();
+                  var timestamp = DateTime.now().millisecondsSinceEpoch;
+                  var groupKey = '${sortedParticipants.join(',')}#$timestamp';
+
+                  // Create the new group session directly
+                  sessions[groupKey] = ChatSession(groupKey, newParticipants);
+
+                  // Switch to the new group session
+                  activeSession = groupKey;
+                  windowOffset = sessionList.indexOf(groupKey);
+
+                  // Set up for group name prompting for the NEW session
                   _waitingForGroupName = true;
                   _pendingParticipants = newParticipants;
                   _pendingSessionKey =
-                      activeSession!; // Store current session for migration
+                      groupKey; // Use the new group session key
 
                   addMessage(
                       activeSession!, '[Added $newParticipant to the chat]',
@@ -1027,11 +1104,40 @@ class TuiChatApp {
                       incoming: true);
                   requestRedraw();
                 } else {
-                  // Already a group - just add participant
+                  // Already a group - add participant and update session key if needed
                   session.participants.add(newParticipant);
+
+                  // Check if session key needs to be updated
+                  var newSessionKey = generateSessionKey(session.participants);
+                  var currentSessionKey = activeSession!;
+
+                  if (newSessionKey != currentSessionKey) {
+                    // Need to migrate to new session key
+                    var groupName = session.groupName;
+                    var messages = session.messages.toList();
+
+                    // Create new session with updated participants
+                    addSession(newSessionKey, session.participants.toList(),
+                        groupName);
+                    sessions[newSessionKey]!.messages.addAll(messages);
+
+                    // Remove old session
+                    sessions.remove(currentSessionKey);
+
+                    // Switch to new session
+                    activeSession = newSessionKey;
+                    windowOffset = sessionList.indexOf(newSessionKey);
+                  }
+
                   addMessage(
                       activeSession!, '[Added $newParticipant to the chat]',
                       incoming: true);
+
+                  // Notify other participants of the membership change
+                  if (onGroupMembershipChange != null) {
+                    onGroupMembershipChange!(activeSession!,
+                        session.participants.toList(), session.groupName);
+                  }
                 }
               } else {
                 addMessage(activeSession!,
@@ -1051,6 +1157,12 @@ class TuiChatApp {
                   addMessage(activeSession!,
                       '[Removed $participantToRemove from the chat]',
                       incoming: true);
+
+                  // Notify other participants of the membership change
+                  if (onGroupMembershipChange != null) {
+                    onGroupMembershipChange!(activeSession!,
+                        session.participants.toList(), session.groupName);
+                  }
                 } else {
                   // Show error message - can't remove yourself
                   addMessage(

@@ -305,6 +305,107 @@ Future<void> atTalk(List<String> args) async {
         return;
       }
 
+      // Check if this is a group membership change notification
+      if (data['type'] == 'groupMembershipChange') {
+        final group = (data['group'] as List).map((e) => e.toString()).toList();
+        final groupName = data['groupName'] as String?;
+        final sessionParticipants = group.toSet().toList()..sort();
+
+        // Try to find existing session with different participant set
+        String? existingSessionKey =
+            tui.findSessionWithParticipants(sessionParticipants);
+
+        if (existingSessionKey == null) {
+          // Look for a session that has some of the same participants but different membership
+          // BUT only migrate existing sessions under specific conditions to avoid overwriting individual chats
+          for (var entry in tui.sessions.entries) {
+            var entryParticipants = entry.value.participants.toSet();
+            var newParticipants = sessionParticipants.toSet();
+
+            // Only consider migrating if:
+            // 1. The existing session is already a group (3+ participants), OR
+            // 2. The existing session is an individual chat (2 participants) AND the new session is also individual with same participants
+            bool shouldMigrate = false;
+
+            if (entryParticipants.length >= 3) {
+              // Existing session is already a group - safe to migrate if there's significant overlap
+              shouldMigrate =
+                  entryParticipants.intersection(newParticipants).length >= 2 &&
+                      entryParticipants.contains(fromAtsign);
+            } else if (entryParticipants.length == 2 &&
+                newParticipants.length == 2) {
+              // Both are individual chats - only migrate if they have exactly the same participants
+              shouldMigrate =
+                  entryParticipants.difference(newParticipants).isEmpty &&
+                      newParticipants.difference(entryParticipants).isEmpty;
+            }
+            // Don't migrate individual chats (2 participants) to group chats (3+ participants)
+
+            if (shouldMigrate) {
+              existingSessionKey = entry.key;
+              break;
+            }
+          }
+        }
+
+        if (existingSessionKey != null) {
+          // Update existing session
+          var session = tui.sessions[existingSessionKey]!;
+          var oldParticipants = session.participants.toSet();
+          var newParticipants = sessionParticipants.toSet();
+
+          // Generate new session key
+          var newSessionKey = tui.generateSessionKey(sessionParticipants);
+
+          if (newSessionKey != existingSessionKey) {
+            // Need to migrate session
+            var messages = session.messages.toList();
+            tui.addSession(newSessionKey, sessionParticipants, groupName);
+            tui.sessions[newSessionKey]!.messages.addAll(messages);
+
+            // Remove old session
+            tui.sessions.remove(existingSessionKey);
+
+            // Update active session if it was the migrated one
+            if (tui.activeSession == existingSessionKey) {
+              tui.activeSession = newSessionKey;
+              tui.windowOffset = tui.sessionList.indexOf(newSessionKey);
+            }
+          } else {
+            // Same key, just update participants and group name
+            session.participants.clear();
+            session.participants.addAll(sessionParticipants);
+            session.groupName = groupName;
+          }
+
+          // Show what changed
+          var added = newParticipants.difference(oldParticipants);
+          var removed = oldParticipants.difference(newParticipants);
+
+          for (var participant in added) {
+            if (participant != fromAtsign) {
+              tui.addMessage(tui.activeSession ?? newSessionKey,
+                  '[${participant} joined the group]',
+                  incoming: true);
+            }
+          }
+          for (var participant in removed) {
+            if (participant != fromAtsign) {
+              tui.addMessage(tui.activeSession ?? newSessionKey,
+                  '[${participant} left the group]',
+                  incoming: true);
+            }
+          }
+        } else {
+          // Create new session
+          var newSessionKey = tui.generateSessionKey(sessionParticipants);
+          tui.addSession(newSessionKey, sessionParticipants, groupName);
+        }
+
+        tui.draw();
+        return;
+      }
+
       final group = (data['group'] as List).map((e) => e.toString()).toList();
       final from = data['from'] as String? ?? notification.from;
       final msg = data['msg'] as String? ?? value;
@@ -348,6 +449,66 @@ Future<void> atTalk(List<String> args) async {
           tui.findSessionWithParticipants(sessionParticipants);
       if (existingSessionKey != null) {
         sessionKey = existingSessionKey;
+      } else {
+        // If no exact match, look for a session that could be an updated version
+        // This handles cases where participant lists have changed
+        // BUT only migrate existing sessions under specific conditions to avoid overwriting individual chats
+        for (var entry in tui.sessions.entries) {
+          var entryParticipants = entry.value.participants.toSet();
+          var newParticipants = sessionParticipants.toSet();
+
+          // Only consider migrating if:
+          // 1. The existing session is already a group (3+ participants), OR
+          // 2. The existing session is an individual chat (2 participants) AND the new session is also individual with same participants
+          bool shouldMigrate = false;
+
+          if (entryParticipants.length >= 3) {
+            // Existing session is already a group - safe to migrate if there's significant overlap
+            shouldMigrate =
+                entryParticipants.intersection(newParticipants).length >= 2 &&
+                    entryParticipants.contains(fromAtsign) &&
+                    newParticipants.contains(fromAtsign);
+          } else if (entryParticipants.length == 2 &&
+              newParticipants.length == 2) {
+            // Both are individual chats - only migrate if they have exactly the same participants
+            shouldMigrate =
+                entryParticipants.difference(newParticipants).isEmpty &&
+                    newParticipants.difference(entryParticipants).isEmpty;
+          }
+          // Don't migrate individual chats (2 participants) to group chats (3+ participants)
+
+          if (shouldMigrate) {
+            // Update the existing session with new participant list
+            var session = entry.value;
+            session.participants.clear();
+            session.participants.addAll(sessionParticipants);
+
+            // Generate correct session key for the updated participant list
+            var correctKey = tui.generateSessionKey(sessionParticipants);
+            if (correctKey != entry.key) {
+              // Need to migrate to correct key
+              var messages = session.messages.toList();
+              var groupName = session.groupName;
+
+              tui.addSession(correctKey, sessionParticipants, groupName);
+              tui.sessions[correctKey]!.messages.addAll(messages);
+
+              // Remove old session
+              tui.sessions.remove(entry.key);
+
+              // Update active session if needed
+              if (tui.activeSession == entry.key) {
+                tui.activeSession = correctKey;
+                tui.windowOffset = tui.sessionList.indexOf(correctKey);
+              }
+
+              sessionKey = correctKey;
+            } else {
+              sessionKey = entry.key;
+            }
+            break;
+          }
+        }
       }
 
       tui.addSession(sessionKey, sessionParticipants, groupName);
@@ -449,6 +610,35 @@ Future<void> atTalk(List<String> args) async {
         'group': session.participants,
         'from': fromAtsign,
         'groupName': newGroupName,
+        'instanceId': instanceId,
+      });
+      await sendNotification(
+          atClient.notificationService, key, payload, logger);
+    }
+  };
+
+  // Group membership change handler
+  tui.onGroupMembershipChange =
+      (String sessionId, List<String> participants, String? groupName) async {
+    final session = tui.sessions[sessionId];
+    if (session == null) return;
+
+    for (final atSign in participants) {
+      var metaData = Metadata()
+        ..isPublic = false
+        ..isEncrypted = true
+        ..namespaceAware = true;
+      var key = AtKey()
+        ..key = 'attalk'
+        ..sharedBy = fromAtsign
+        ..sharedWith = atSign
+        ..namespace = nameSpace
+        ..metadata = metaData;
+      var payload = jsonEncode({
+        'type': 'groupMembershipChange',
+        'group': participants,
+        'from': fromAtsign,
+        'groupName': groupName,
         'instanceId': instanceId,
       });
       await sendNotification(
