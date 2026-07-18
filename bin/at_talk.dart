@@ -4,8 +4,8 @@ import 'dart:async';
 
 // external packages
 import 'package:args/args.dart';
+import 'package:at_cli_commons/at_cli_commons.dart';
 import 'package:at_talk/pipe_print.dart';
-import 'package:at_talk/service_factories.dart';
 import 'package:logging/src/level.dart';
 import 'package:chalkdart/chalk.dart';
 
@@ -14,18 +14,12 @@ import 'package:at_client/at_client.dart';
 import 'package:at_utils/at_logger.dart';
 import 'package:at_onboarding_cli/at_onboarding_cli.dart';
 
-// Local Packages
-import 'package:at_talk/home_directory.dart';
-import 'package:at_talk/check_file_exists.dart';
-import 'package:version/version.dart';
-
 const String digits = '0123456789';
 final RegExp generateCommandRegEx = RegExp(r'^/gen \d+$');
 
 void main(List<String> args) async {
   //starting secondary in a zone
   var logger = AtSignLogger('atTalk sender ');
-  logger.logger.level = Level.SHOUT;
   await runZonedGuarded(() async {
     await atTalk(args);
   }, (error, stackTrace) {
@@ -36,7 +30,6 @@ void main(List<String> args) async {
 
 Future<void> atTalk(List<String> args) async {
   final AtSignLogger logger = AtSignLogger(' atTalk ');
-  logger.hierarchicalLoggingEnabled = true;
   logger.logger.level = Level.SHOUT;
 
   var parser = ArgParser();
@@ -51,10 +44,14 @@ Future<void> atTalk(List<String> args) async {
   parser.addOption('root-domain',
       abbr: 'd',
       mandatory: false,
-      help: 'Root Domain (defaults to root.atsign.org)');
+      defaultsTo: 'root.atsign.org:64',
+      help: 'Root Domain (defaults to root.atsign.org:64)');
   parser.addOption('namespace',
       abbr: 'n', mandatory: false, help: 'Namespace (defaults to ai6bh)');
   parser.addFlag('verbose', abbr: 'v', help: 'More logging', negatable: false);
+  parser.addFlag('debug', abbr: 'D', help: 'So much logging', negatable: false);
+  parser.addFlag('buffer-input',
+      abbr: 'b', help: 'More logging', defaultsTo: true);
   parser.addFlag('never-sync',
       help: 'Completely disable sync', negatable: false);
 
@@ -62,23 +59,21 @@ Future<void> atTalk(List<String> args) async {
   dynamic parsedArgs;
   String atsignFile;
 
-  String fromAtsign = 'unknown';
-  String toAtsign = 'unknown';
-  String? homeDirectory = getHomeDirectory();
+  Atsign fromAtsign = 'unknown'.toAtsign();
+  Atsign toAtsign = 'unknown'.toAtsign();
+  String homeDirectory = getHomeDirectory(throwIfNull: true)!;
   String nameSpace = 'ai6bh';
-  String rootDomain = 'root.atsign.org';
-  bool hasTerminal = true;
+  bool bufferInput;
+  AtRootDomain atRootDomain;
 
   try {
     // Arg check
     parsedArgs = parser.parse(args);
     // Find atSign key file
-    fromAtsign = parsedArgs['atsign'];
-    toAtsign = parsedArgs['toatsign'];
-
-    if (parsedArgs['root-domain'] != null) {
-      rootDomain = parsedArgs['root-domain'];
-    }
+    fromAtsign = parsedArgs['atsign'].toString().toAtsign();
+    toAtsign = parsedArgs['toatsign'].toString().toAtsign();
+    bufferInput = parsedArgs['buffer-input'] && !stdin.hasTerminal;
+    atRootDomain = AtRootDomain.parse(parsedArgs['root-domain']);
 
     if (parsedArgs['namespace'] != null) {
       nameSpace = parsedArgs['namespace'];
@@ -109,23 +104,30 @@ Future<void> atTalk(List<String> args) async {
 
 // Now on to the atPlatform startup
   AtSignLogger.root_level = 'SHOUT';
-  if (parsedArgs['verbose']) {
+  if (parsedArgs['debug']) {
+    logger.logger.level = Level.FINEST;
+    AtSignLogger.root_level = 'FINEST';
+  } else if (parsedArgs['verbose']) {
     logger.logger.level = Level.INFO;
-
     AtSignLogger.root_level = 'INFO';
   }
 
+  final storagePath = standardAtClientStoragePath(
+    baseDir: homeDirectory,
+    atSign: fromAtsign,
+    progName: 'at_talk',
+    uniqueID: pid.toString(),
+  );
   //onboarding preference builder can be used to set onboardingService parameters
   AtOnboardingPreference atOnboardingConfig = AtOnboardingPreference()
-    ..hiveStoragePath = '$homeDirectory/.$nameSpace/$fromAtsign/storage'
+    ..hiveStoragePath = storagePath
+    ..commitLogPath = '$storagePath/commitLog'
     ..namespace = nameSpace
     ..downloadPath = '$homeDirectory/.$nameSpace/files'
-    ..isLocalStoreRequired = true
-    ..commitLogPath = '$homeDirectory/.$nameSpace/$fromAtsign/storage/commitLog'
-    ..rootDomain = rootDomain
+    ..rootDomain = atRootDomain.rootDomain
+    ..rootPort = atRootDomain.rootPort
     ..fetchOfflineNotifications = true
-    ..atKeysFilePath = atsignFile
-    ..atProtocolEmitted = Version(2, 0, 0);
+    ..atKeysFilePath = atsignFile;
 
   var metaData = Metadata()
     ..isPublic = false
@@ -149,7 +151,7 @@ Future<void> atTalk(List<String> args) async {
       stdout.write(chalk.brightBlue('\r\x1b[KConnecting ... '));
       await Future.delayed(Duration(
           milliseconds:
-          1000)); // Pause just long enough for the retry to be visible
+              1000)); // Pause just long enough for the retry to be visible
       onboarded = await onboardingService.authenticate();
     } catch (exception) {
       stdout.write(chalk.brightRed(
@@ -171,7 +173,8 @@ Future<void> atTalk(List<String> args) async {
     keyAtsign = keyAtsign.replaceAll('${notification.to}:', '');
     keyAtsign = keyAtsign.replaceAll('.$nameSpace${notification.from}', '');
     if (keyAtsign == 'attalk') {
-      logger.info('atTalk update received from ${notification.from} notification id : ${notification.id}');
+      logger.info(
+          'atTalk update received from ${notification.from} notification id : ${notification.id}');
       var talk = notification.value!;
       // Terminal Control
       // '\r\x1b[K' is used to set the cursor back to the beginning of the line then deletes to the end of line
@@ -182,8 +185,8 @@ Future<void> atTalk(List<String> args) async {
       pipePrint('$fromAtsign: ');
     }
   }),
-      onError: (e) => logger.severe('Notification Failed:$e'),
-      onDone: () => logger.info('Notification listener stopped'));
+          onError: (e) => logger.severe('Notification Failed:$e'),
+          onDone: () => logger.info('Notification listener stopped'));
 
   String input = "";
   String buffer = "";
@@ -198,7 +201,7 @@ Future<void> atTalk(List<String> args) async {
       exit(0);
     }
     if (input.startsWith(RegExp('^/@'))) {
-      toAtsign = input.replaceFirst(RegExp('^/'), '');
+      toAtsign = input.replaceFirst(RegExp('^/'), '').toAtsign();
       print('now talking to: $toAtsign');
       input = '';
     }
@@ -214,7 +217,6 @@ Future<void> atTalk(List<String> args) async {
       ..isEncrypted = true
       ..namespaceAware = true;
 
-
     var key = AtKey()
       ..key = 'attalk'
       ..sharedBy = fromAtsign
@@ -223,15 +225,14 @@ Future<void> atTalk(List<String> args) async {
       ..metadata = metaData;
 
     if (!(input == "")) {
-      if (!(stdin.hasTerminal)) {
-        hasTerminal = false;
+      if (bufferInput) {
         buffer = '$buffer\n\r$input';
       } else {
-        hasTerminal = true;
         var success =
-        sendNotification(atClient.notificationService, key, input, logger);
+            sendNotification(atClient.notificationService, key, input, logger);
         if (!await success) {
-          print('${chalk.brightRed.bold('\r\x1b[KError Sending: ')}"$input" to $toAtsign - unable to reach the Internet !');
+          print(
+              '${chalk.brightRed.bold('\r\x1b[KError Sending: ')}"$input" to $toAtsign - unable to reach the Internet !');
           pipePrint('$fromAtsign: ');
         }
       }
@@ -239,11 +240,12 @@ Future<void> atTalk(List<String> args) async {
   }
 
 // Send file contents if stdin has no terminal
-  if (!(hasTerminal)) {
+  if (bufferInput) {
     var success = sendNotification(atClient.notificationService, key,
         chalk.brightBlue('Sending a file') + chalk.white(buffer), logger);
     if (!await success) {
-      print('${chalk.brightRed.bold('\r\x1b[KError Sending: ')}"$input" to $toAtsign - unable to reach the Internet !');
+      print(
+          '${chalk.brightRed.bold('\r\x1b[KError Sending: ')}"$input" to $toAtsign - unable to reach the Internet !');
       pipePrint('$fromAtsign: ');
     }
   }
@@ -259,7 +261,8 @@ Future<bool> sendNotification(NotificationService notificationService,
   for (int retry = 0; retry < 3; retry++) {
     try {
       NotificationResult result = await notificationService.notify(
-          NotificationParams.forUpdate(key, value: input),
+          NotificationParams.forUpdate(key,
+              value: input, notificationExpiry: Duration(minutes: 30)),
           waitForFinalDeliveryStatus: false,
           checkForFinalDeliveryStatus: false);
       if (result.atClientException != null) {
